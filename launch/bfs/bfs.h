@@ -38,9 +38,11 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
     printf("-- epoch %d %lu --> push\n", hop, *in_index);
     for (unsigned long i = tid; i < *in_index; i += num_threads) {
       unsigned long node = in_wl[i];
-      for (unsigned long e = G.node_array[node]; e < G.node_array[node+1]; e++) {
+      unsigned long start = G.node_array[node]; // starting position
+      unsigned long end = G.node_array[node+1]; // ending position
+      for (unsigned long e = start; e < end; e++) {
 	unsigned long edge_index = G.edge_array[e];
-      	unsigned long v = ret[edge_index];
+      	unsigned long v = ret[edge_index]; // PROBLEM
 	if (v == -1) {
 	  ret[edge_index] = hop;
 	  unsigned long index = *out_index;

@@ -5,9 +5,8 @@ import sys
 
 from subprocess import Popen, PIPE
 
-HOME = "/home/aninda/vldb/" # ADD DIRECTORY PATH HERE
-GRAPH_DIR = HOME + "data/"
-RESULT_DIR = HOME + "results/"
+GRAPH_DIR = "/home/amanocha/data/"
+RESULT_DIR = "results/"
 
 # APPS
 apps = ["bfs", "sssp", "pagerank"]
