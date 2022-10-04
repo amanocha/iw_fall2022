@@ -1,9 +1,10 @@
 #include "string"
 #include "track_access.h"
+// test
 
 int main(int argc, char *argv[])
 {
-    int cycles = stoi(argv[0]);
+    int cycles = stoi(argv[1]);
     init();
 
     for (int i = 0; i < cycles; i++)
@@ -15,7 +16,7 @@ int main(int argc, char *argv[])
         track_access(x);
     }
 
-    printf("memory accesses = %d\n", total_num_accesses);
-    printf("cache hits = %d\n", num_hits);
-    printf("cache misses = %d\n", num_misses);
+    printf("memory accesses = %lu\n", total_num_accesses);
+    printf("cache hits = %lu\n", num_hits);
+    printf("cache misses = %lu\n", num_misses);
 }
