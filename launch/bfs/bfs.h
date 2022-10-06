@@ -45,18 +45,18 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
     for (unsigned long i = tid; i < *in_index; i += num_threads)
     {
       unsigned long node = in_wl[i];
-      track_access((uint64_t)(&in_wl[i]));
+      // track_access((uint64_t)(&in_wl[i]));
       unsigned long start = G.node_array[node];   // starting position
       unsigned long end = G.node_array[node + 1]; // ending position
 
-      track_access((uint64_t)&G.node_array[node]); // do i even need these?
-      track_access((uint64_t)&G.node_array[node + 1]);
+      // track_access((uint64_t)&G.node_array[node]); // do i even need these?
+      // track_access((uint64_t)&G.node_array[node + 1]);
 
       for (unsigned long e = start; e < end; e++)
       {
         unsigned long edge_index = G.edge_array[e];
         unsigned long v = ret[edge_index]; // PROBLEM
-        track_access((uint64_t)&ret[edge_index]);
+        // track_access((uint64_t)&ret[edge_index]);
         if (v == -1)
         {
           ret[edge_index] = hop;
