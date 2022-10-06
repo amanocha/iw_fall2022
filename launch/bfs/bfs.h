@@ -45,6 +45,8 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
     for (unsigned long i = tid; i < *in_index; i += num_threads)
     {
       unsigned long node = in_wl[i];
+      uint64_t vaddr = (uint64_t)(&in_wl[i]);
+      printf("vaddr = %lu", vaddr);
       // track_access((uint64_t)(&in_wl[i]));
       unsigned long start = G.node_array[node];   // starting position
       unsigned long end = G.node_array[node + 1]; // ending position
