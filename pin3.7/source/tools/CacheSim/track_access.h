@@ -10,7 +10,7 @@ bool dirty_evict;
 int64_t evicted_tag;
 uint64_t evicted_offset;
 
-void init()
+void init_cache()
 {
     dirty_evict = false;
     evicted_tag = -1;

@@ -33,6 +33,8 @@ void init_kernel(int num_nodes, int start_seed, unsigned long *in_index, unsigne
     (*in_wl)[index] = i;
     (*ret)[i] = 0;
   }
+
+  init_cache();
 }
 
 void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long *in_index, unsigned long *out_wl, unsigned long *out_index, int tid, int num_threads)
