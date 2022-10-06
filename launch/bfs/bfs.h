@@ -80,7 +80,7 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
   }
 
   // print results from track_access
-  printf("memory accesses = %lu\n", total_num_accesses);
+  printf("\nmemory accesses = %lu\n", total_num_accesses);
   printf("cache hits = %lu\n", num_hits);
   printf("cache misses = %lu\n", num_misses);
 }
