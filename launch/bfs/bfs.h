@@ -48,8 +48,8 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
     {
       unsigned long node = in_wl[i];
       uint64_t vaddr = (uint64_t)(&in_wl[i]);
-      printf("vaddr = %lu", vaddr);
-      track_access(29099);
+      // printf("vaddr = %lu", vaddr);
+      track_access(vaddr);
       unsigned long start = G.node_array[node];   // starting position
       unsigned long end = G.node_array[node + 1]; // ending position
 
