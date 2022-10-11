@@ -38,6 +38,7 @@ END_LEGAL */
 #include <iomanip>
 #include <map>
 #include <string>
+#include "track_access.h"
 
 /* ===================================================================== */
 /* Global Variables */
@@ -47,7 +48,6 @@ END_LEGAL */
 bool isROI = false;
 const CHAR * ROI_BEGIN = "pin_start";
 const CHAR * ROI_END = "pin_end";
-unsigned long total_num_accesses = 0;
 
 std::map<std::string, unsigned long> access_intervals;
 
@@ -182,7 +182,7 @@ static VOID RecordMem(VOID * ip, CHAR r, VOID * addr, INT32 size, BOOL isPrefetc
               << hex << setw(2+2*sizeof(ADDRINT));
     */
 
-    total_num_accesses++;
+    track_access((uint64_t) addr);
     return;
 
     if (!isPrefetch)
@@ -298,8 +298,11 @@ int main(int argc, char *argv[])
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
 
+    // Initialize cache
+    init();
+
     // Never returns
-    PIN_StartProgram();
+    PIN_StartProgram(); // TODO: mark pin_start() and pin_end()
     
     RecordMemWrite(0);
     RecordWriteAddrSize(0, 0);

@@ -5,7 +5,7 @@ import sys
 
 from subprocess import Popen, PIPE
 
-GRAPH_DIR = "/home/amanocha/data/"
+GRAPH_DIR = "/home/amanocha/data/vp/"
 RESULT_DIR = "results/"
 
 # APPS
