@@ -24,6 +24,7 @@
 #define KB_SIZE 1024
 #define THP_SIZE_KB 2048
 #define PERCENT_INTERVAL 0.05
+#define HUGEPAGE_SIZE 2097152
 
 using namespace std;
 extern int errno;
@@ -194,8 +195,8 @@ void launch_app(string graph_fname, int run_kernel, unsigned long start_seed) {
   *edge_addr = G.edge_array;
   *ret_addr = ret;
 
-  setup_pagemaps(pid); 
-  total_num_thps = (num_nodes*sizeof(unsigned long)+pmd_pagesize-1)/pmd_pagesize;
+  //setup_pagemaps(pid); 
+  total_num_thps = (num_nodes*sizeof(unsigned long)+HUGEPAGE_SIZE-1)/HUGEPAGE_SIZE;
 
   // Signal to other processes that app execution will start
   ofstream output(done_filename);
@@ -291,7 +292,7 @@ int main(int argc, char** argv) {
       int cpid2 = fork();
       if (cpid2 == 0) {
         numa_set_membind(parent_mask);
-        launch_thp_tracking(cpid2, run_kernel, thp_filename, pf_filename, max_demotion_scans); // child process tracking THPs
+        //launch_thp_tracking(cpid2, run_kernel, thp_filename, pf_filename, max_demotion_scans); // child process tracking THPs
       } else {
         numa_set_membind(parent_mask);
         setpgid(cpid2, 0); // set the child the leader of its process group
