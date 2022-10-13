@@ -7,14 +7,11 @@ int main(int argc, char *argv[])
     int cycles = stoi(argv[1]);
     init_cache();
 
-    // generate random 64 bit int (vaddr)
-    uint64_t x = 0;
-
     for (int i = 0; i < cycles; i++)
     {
         // track vaddr access
-        track_access(x);
-        x += 1;
+
+        track_access((uint64_t)i);
     }
 
     printf("memory accesses = %lu\n", total_num_accesses);
