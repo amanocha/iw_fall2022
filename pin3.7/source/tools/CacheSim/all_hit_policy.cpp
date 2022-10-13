@@ -8,12 +8,12 @@ int main(int argc, char *argv[])
     init_cache();
 
     // generate random 64 bit int (vaddr)
-    uint64_t x = ((((((rand() % 65535) << 16) | (rand() % 65535)) << 16) | (rand() % 65535)) << 16) | (rand() % 65535);
+    int x = 1;
 
     for (int i = 0; i < cycles; i++)
     {
         // track vaddr access
-        track_access(x);
+        track_access((uint64_t)&x);
     }
 
     printf("memory accesses = %lu\n", total_num_accesses);
