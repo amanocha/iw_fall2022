@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
     {
         // track vaddr access
 
-        track_access((uint64_t)malloc(sizeof(int)));
+        track_access((uint64_t)i);
     }
 
     printf("memory accesses = %lu\n", total_num_accesses);
