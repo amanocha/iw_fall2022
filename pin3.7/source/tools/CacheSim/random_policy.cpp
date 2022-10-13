@@ -5,7 +5,7 @@
 int main(int argc, char *argv[])
 {
     int cycles = stoi(argv[1]);
-    init();
+    init_cache();
 
     for (int i = 0; i < cycles; i++)
     {
