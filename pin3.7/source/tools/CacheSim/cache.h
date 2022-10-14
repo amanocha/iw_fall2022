@@ -80,7 +80,12 @@ public:
     CacheLine *c = addr_map[address];
     if (c)
     { // Hit
-      deleteNode(c);
+
+      // policy 3 == Clock Algo
+      // only want to delete if policy is not Clock Algo
+      if (policy != 3) 
+        deleteNode(c);
+      
       if (policy == 0)
       {
         insertFront(c, head);
@@ -264,6 +269,10 @@ public:
     c->prev->next = c->next;
     c->next->prev = c->prev;
   }
+
+
+  // methods for Clock Algo
+  void clock_evict(CacheLine *c)
 };
 
 class FunctionalCache
