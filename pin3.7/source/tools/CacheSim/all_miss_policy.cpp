@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < cycles; i++)
     {
-        track_access((uint64_t)(5000*i);
+        track_access((uint64_t)(5000 * i));
     }
 
     printf("memory accesses = %lu\n", total_num_accesses);
