@@ -102,6 +102,7 @@ public:
 
       if (!isLoad)
         c->dirty = true;
+
       c->offset = offset;
       c->freq++;
       if (c->freq == MAX_FREQ)
@@ -270,9 +271,28 @@ public:
     c->next->prev = c->prev;
   }
 
+  /*
+  * This method iterates through the circular linked list (i.e. the "clock")
+  * and finds the first node with a clear dirty bit. For a given node, if it's
+  * dirty bit is set, we clear it and continue.
+  * We then 
+  */
+  void insertClock(CacheLine *c, CacheLine *currHead)
+  {
+    CacheLine *curr = head->next;d
+    
+    while (curr->dirty)
+    {
+      curr->dirty = false
+      curr = curr->next
+    }
 
-  // methods for Clock Algo
-  void clock_evict(CacheLine *c)
+    // swap out curr for c
+    curr->next->prev = c
+    curr->prev->next = c
+    c->next = curr->next
+    c->prev = curr->prev
+  }
 };
 
 class FunctionalCache
