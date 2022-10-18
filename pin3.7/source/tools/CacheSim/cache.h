@@ -61,12 +61,19 @@ public:
       c = &entries[i];
       freeEntries.push_back(c);
     }
-    head = new CacheLine;
-    tail = new CacheLine;
-    head->prev = NULL;
-    head->next = tail;
-    tail->next = NULL;
-    tail->prev = head;
+    if (eviction_policy == 3)
+    {
+      // set up circular linked list for Clock algo
+    }
+    else 
+    {
+      head = new CacheLine;
+      tail = new CacheLine;
+      head->prev = NULL;
+      head->next = tail;
+      tail->next = NULL;
+      tail->prev = head;
+    }
   }
   ~CacheSet()
   {
