@@ -40,6 +40,7 @@ class CacheSet
 public:
   CacheLine *head;
   CacheLine *tail;
+  CacheLine *clockPointer;
   CacheLine *entries;
   std::vector<CacheLine *> freeEntries;
   std::unordered_map<uint64_t, CacheLine *> addr_map;
@@ -70,9 +71,7 @@ public:
       head->next = tail;
       tail->prev = head;
       tail->next = head;
-      for (int i = 0; i < associativity; i++)
-      {
-      }
+      clockPointer = head;
     }
     else
     {
@@ -150,13 +149,17 @@ public:
       *evictedOffset = c->offset;
       *dirtyEvict = c->dirty;
 
-      if (policy != 3)
+      if (policy == 3)
+        swapClock(c);
+      else
         deleteNode(c);
     }
     else
     { // there is space, no need for eviction
       c = freeEntries.back();
       freeEntries.pop_back();
+      if (policy == 3)
+        insertClock(c);
     }
 
     addr_map[address] = c; // insert into address map
@@ -171,7 +174,7 @@ public:
     else if (policy == 2)
       insertLFU(c, head); // insert by frequency
     else if (policy == 3)
-      swapClock(c, head); // insert by Clock (second chance)
+      insertClock(c); // insert by Clock (second chance)
   }
 
   void evict(uint64_t address, bool *dirtyEvict)
@@ -294,27 +297,44 @@ public:
     c->next->prev = c->prev;
   }
 
-  /*
+  /**
+   * This method is only called when the cache is not yet filled. The Clock
+   * algo just needs to add another node to the circularly linked list and
+   * set the clock hand to this new node.
+   */
+  void insertClock(CacheLine *c)
+  {
+    c->next = tail;
+    tail->prev = c;
+    c->prev = clockPointer;
+    clockPointer->next = c;
+    clockPointer = clockPointer->next;
+  }
+
+  /**
    * This method iterates through the circular linked list (i.e. the "clock")
    * and finds the first node with a clear dirty bit. For a given node, if it's
    * dirty bit is set, we clear it and continue.
    * We then
    */
-  void swapClock(CacheLine *c, CacheLine *currHead)
+  void swapClock(CacheLine *c)
   {
-    CacheLine *curr = head->next;
+    // clockPointer will store the most recently used page (which means the
+    // next page is the oldest page)
+    clockPointer = clockPointer->next;
 
-    while (curr->dirty)
+    while (clockPointer->dirty || clockPointer == head || clockPointer == tail)
     {
-      curr->dirty = false;
-      curr = curr->next;
+      clockPointer->dirty = false;
+      clockPointer = curr->next;
     }
 
     // swap out curr for c
-    curr->next->prev = c;
-    curr->prev->next = c;
-    c->next = curr->next;
-    c->prev = curr->prev;
+    clockPointer->next->prev = c;
+    clockPointer->prev->next = c;
+    c->next = clockPointer->next;
+    c->prev = clockPointer->prev;
+    clockPointer = c;
   }
 };
 
