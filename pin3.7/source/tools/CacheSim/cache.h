@@ -64,8 +64,17 @@ public:
     if (eviction_policy == 3)
     {
       // set up circular linked list for Clock algo
+      head = new CacheLine;
+      tail = new CacheLine;
+      head->prev = tail;
+      head->next = tail;
+      tail->prev = head;
+      tail->next = head;
+      for (int i = 0; i < associativity; i++)
+      {
+      }
     }
-    else 
+    else
     {
       head = new CacheLine;
       tail = new CacheLine;
@@ -82,6 +91,9 @@ public:
     delete[] entries;
   }
 
+  // access() is called only when we have a page hit
+  // this is to reorder the nodes (for LFU, LRU, etc.)
+  // NOT meant to evict or delete any pages
   bool access(uint64_t address, uint64_t offset, bool isLoad)
   {
     CacheLine *c = addr_map[address];
@@ -90,9 +102,9 @@ public:
 
       // policy 3 == Clock Algo
       // only want to delete if policy is not Clock Algo
-      if (policy != 3) 
+      if (policy != 3)
         deleteNode(c);
-      
+
       if (policy == 0)
       {
         insertFront(c, head);
@@ -137,7 +149,9 @@ public:
       *evictedAddr = c->addr;
       *evictedOffset = c->offset;
       *dirtyEvict = c->dirty;
-      deleteNode(c);
+
+      if (policy != 3)
+        deleteNode(c);
     }
     else
     { // there is space, no need for eviction
@@ -156,6 +170,8 @@ public:
       insertHalf(c, head); // insert halfway into set
     else if (policy == 2)
       insertLFU(c, head); // insert by frequency
+    else if (policy == 3)
+      swapClock(c, head); // insert by Clock (second chance)
   }
 
   void evict(uint64_t address, bool *dirtyEvict)
@@ -279,26 +295,26 @@ public:
   }
 
   /*
-  * This method iterates through the circular linked list (i.e. the "clock")
-  * and finds the first node with a clear dirty bit. For a given node, if it's
-  * dirty bit is set, we clear it and continue.
-  * We then 
-  */
-  void insertClock(CacheLine *c, CacheLine *currHead)
+   * This method iterates through the circular linked list (i.e. the "clock")
+   * and finds the first node with a clear dirty bit. For a given node, if it's
+   * dirty bit is set, we clear it and continue.
+   * We then
+   */
+  void swapClock(CacheLine *c, CacheLine *currHead)
   {
-    CacheLine *curr = head->next;d
-    
+    CacheLine *curr = head->next;
+
     while (curr->dirty)
     {
-      curr->dirty = false
-      curr = curr->next
+      curr->dirty = false;
+      curr = curr->next;
     }
 
     // swap out curr for c
-    curr->next->prev = c
-    curr->prev->next = c
-    c->next = curr->next
-    c->prev = curr->prev
+    curr->next->prev = c;
+    curr->prev->next = c;
+    c->next = curr->next;
+    c->prev = curr->prev;
   }
 };
 
