@@ -149,17 +149,13 @@ public:
       *evictedOffset = c->offset;
       *dirtyEvict = c->dirty;
 
-      if (policy == 3)
-        swapClock(c);
-      else
+      if (policy != 3)
         deleteNode(c);
     }
     else
     { // there is space, no need for eviction
       c = freeEntries.back();
       freeEntries.pop_back();
-      if (policy == 3)
-        insertClock(c);
     }
 
     addr_map[address] = c; // insert into address map
@@ -174,7 +170,12 @@ public:
     else if (policy == 2)
       insertLFU(c, head); // insert by frequency
     else if (policy == 3)
-      insertClock(c); // insert by Clock (second chance)
+    {
+      if (eviction)
+        swapClock(c); // evict and insert by Clock (second chance)
+      else
+        insertClock(c); // just insert by Clock
+    }
   }
 
   void evict(uint64_t address, bool *dirtyEvict)
