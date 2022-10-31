@@ -99,9 +99,9 @@ public:
     if (c)
     { // Hit
 
-      // policy 3 == Clock Algo
-      // only want to delete if policy is not Clock Algo
-      if (policy != 3)
+      // policy 3 == Clock Algo, 4 == FIFO
+      // only want to delete if policy is not Clock Algo or FIFO
+      if (policy != 3 && policy != 4)
         deleteNode(c);
 
       if (policy == 0)
@@ -149,7 +149,7 @@ public:
       *evictedOffset = c->offset;
       *dirtyEvict = c->dirty;
 
-      if (policy != 3)
+      if (policy != 3 && policy != 4)
         deleteNode(c);
     }
     else
@@ -175,6 +175,11 @@ public:
         swapClock(c); // evict and insert by Clock (second chance)
       else
         insertClock(c); // just insert by Clock
+    }
+    else if (policy == 4)
+    {
+      // handle Fifo
+      insertFIFO(c, eviction);
     }
   }
 
@@ -316,7 +321,6 @@ public:
    * This method iterates through the circular linked list (i.e. the "clock")
    * and finds the first node with a clear dirty bit. For a given node, if it's
    * dirty bit is set, we clear it and continue.
-   * We then
    */
   void swapClock(CacheLine *c)
   {
@@ -336,6 +340,21 @@ public:
     c->next = clockPointer->next;
     c->prev = clockPointer->prev;
     clockPointer = c;
+  }
+
+  void insertFIFO(CacheLine *c, bool at_capacity)
+  {
+    if (at_capacity)
+    {
+      rmv = tail;
+      tail = tail->prev;
+      deleteNode(rmv)
+    }
+
+    c->next = head->next;
+    c->next->prev = c;
+    head->next = c;
+    c->prev = head;
   }
 };
 
