@@ -54,6 +54,7 @@ public:
     associativity = size;
     line_size = cache_line_size;
     policy = eviction_policy;
+    cout << "policy = " << policy << "\n";
 
     CacheLine *c;
     entries = new CacheLine[associativity];
@@ -62,7 +63,7 @@ public:
       c = &entries[i];
       freeEntries.push_back(c);
     }
-    if (eviction_policy == 3)
+    if (policy == 3)
     {
       // set up circular linked list for Clock algo
       head = new CacheLine;
@@ -331,7 +332,7 @@ public:
     while (clockPointer->dirty || clockPointer == head || clockPointer == tail)
     {
       clockPointer->dirty = false;
-      clockPointer = curr->next;
+      clockPointer = clockPointer->next;
     }
 
     // swap out curr for c
@@ -346,9 +347,9 @@ public:
   {
     if (at_capacity)
     {
-      rmv = tail;
+      CacheLine *rmv = tail;
       tail = tail->prev;
-      deleteNode(rmv)
+      deleteNode(rmv);
     }
 
     c->next = head->next;
@@ -368,7 +369,7 @@ public:
   int log_line_size;
   vector<CacheSet *> sets;
 
-  FunctionalCache(unsigned long size, int assoc, int line_size, unsigned int eviction_policy = 0)
+  FunctionalCache(unsigned long size, int assoc, int line_size, unsigned int eviction_policy)
   {
     cache_line_size = line_size;
     line_count = size / cache_line_size;
