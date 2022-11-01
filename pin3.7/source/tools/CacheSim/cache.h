@@ -26,14 +26,14 @@ using namespace std;
 
 /**
 * TODOs
-* - Figure out TBD policy (gets stuck in infinite loop on all_miss_policy, but fine on all_hit_policy)
+* - Figure out LRU_HALF policy (gets stuck in infinite loop on all_miss_policy, but fine on all_hit_policy)
 * - Clock algo throws seg fault on all_miss_policy, works fine on all_hit_policy
 */
 
 enum Replacement_Policy 
 {
   LRU,
-  TBD,
+  LRU_HALF,
   LFU,
   CLOCK,
   FIFO
@@ -117,14 +117,14 @@ public:
 
       // policy 3 == Clock Algo, 4 == FIFO
       // only want to delete if policy is not Clock Algo or FIFO
-      if (policy == LRU || policy == TBD || policy == LFU)
+      if (policy == LRU || policy == LRU_HALF || policy == LFU)
         deleteNode(c);
 
       if (policy == LRU)
       {
         insertFront(c, head);
       }
-      else if (policy == TBD)
+      else if (policy == LRU_HALF)
       {
         if (c->freq >= associativity / 2)
           insertFront(c, head);
@@ -159,7 +159,7 @@ public:
     {
       // cout << "EVICTION NEEDED\n";
       // Clock policy does not currently know which node to delete
-      if (policy == LRU || policy == TBD || policy == LFU || policy == FIFO) 
+      if (policy == LRU || policy == LRU_HALF || policy == LFU || policy == FIFO) 
       {
         c = tail->prev; // LRU, LFU
         assert(c != head);
@@ -184,7 +184,7 @@ public:
 
     if (policy == LRU)
       insertFront(c, head); // LRU for insertion
-    else if (policy == TBD)
+    else if (policy == LRU_HALF)
       insertHalf(c, head); // insert halfway into set
     else if (policy == LFU)
       insertLFU(c, head); // insert by frequency
