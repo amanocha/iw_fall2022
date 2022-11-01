@@ -147,7 +147,7 @@ public:
       {
         c = tail->prev; // LRU, LFU
         assert(c != head);
-        map_evict(c);
+        map_evict(c, dirtyEvict, evictedAddr, evictedOffset);
         deleteNode(c);
       }
     }
@@ -171,19 +171,19 @@ public:
     else if (policy == 3)
     {
       if (eviction)
-        swapClock(c); // evict and insert by Clock (second chance)
+        swapClock(c, dirtyEvict, evictedAddr, evictedOffset); // evict and insert by Clock (second chance)
       else
         insertClock(c); // just insert by Clock
     }
     else if (policy == 4)
     {
       // handle Fifo
-      insertFIFO(c, eviction);
+      insertFIFO(c);
     }
   }
 
   // helper method to clear entry from address map
-  void map_evict(CacheLine *c) 
+  void map_evict(CacheLine *c, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset)
   {
     addr_map.erase(c->addr);
     *evictedAddr = c->addr;
@@ -330,7 +330,7 @@ public:
    * and finds the first node with a clear dirty bit. For a given node, if it's
    * dirty bit is set, we clear it and continue.
    */
-  void swapClock(CacheLine *c)
+  void swapClock(CacheLine *c, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset)
   {
     CacheLine *rmv;
     // clockPointer will store the most recently used page (which means the
@@ -350,7 +350,7 @@ public:
     c->prev = clockPointer->prev;
     rmv = clockPointer;
     clockPointer = c;
-    map_evict(rmv);
+    map_evict(rmv, dirtyEvict, evictedAddr, evictedOffset);
   }
 
   void insertFIFO(CacheLine *c)
