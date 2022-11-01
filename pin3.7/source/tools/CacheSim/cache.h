@@ -1,5 +1,5 @@
-#include <map>
 #include <unordered_map>
+#include <map>
 #include <vector>
 #include <set>
 #include <bitset>
@@ -142,13 +142,17 @@ public:
 
     if (eviction)
     {
-      c = tail->prev; // LRU
-      assert(c != head);
+      // TODO: handle address map updates for other policies
+      if (policy == 0 || policy == 1) 
+      {
+        c = tail->prev; // LRU
+        assert(c != head);
 
-      addr_map.erase(c->addr); // removing tag
-      *evictedAddr = c->addr;
-      *evictedOffset = c->offset;
-      *dirtyEvict = c->dirty;
+        addr_map.erase(c->addr); // removing tag
+        *evictedAddr = c->addr;
+        *evictedOffset = c->offset;
+        *dirtyEvict = c->dirty;
+      }
 
       if (policy != 3 && policy != 4)
         deleteNode(c);
