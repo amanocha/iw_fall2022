@@ -142,20 +142,14 @@ public:
 
     if (eviction)
     {
-      // TODO: handle address map updates for other policies
-      if (policy == 0 || policy == 1) 
+      // Clock policy does not currently know which node to delete
+      if (policy == 0 || policy == 1 || policy == 2 || policy == 4) 
       {
-        c = tail->prev; // LRU
+        c = tail->prev; // LRU, LFU
         assert(c != head);
-
-        addr_map.erase(c->addr); // removing tag
-        *evictedAddr = c->addr;
-        *evictedOffset = c->offset;
-        *dirtyEvict = c->dirty;
-      }
-
-      if (policy != 3 && policy != 4)
+        map_evict(c);
         deleteNode(c);
+      }
     }
     else
     { // there is space, no need for eviction
@@ -186,6 +180,15 @@ public:
       // handle Fifo
       insertFIFO(c, eviction);
     }
+  }
+
+  // helper method to clear entry from address map
+  void map_evict(CacheLine *c) 
+  {
+    addr_map.erase(c->addr);
+    *evictedAddr = c->addr;
+    *evictedOffset = c->offset;
+    *dirtyEvict = c->dirty;
   }
 
   void evict(uint64_t address, bool *dirtyEvict)
@@ -329,6 +332,7 @@ public:
    */
   void swapClock(CacheLine *c)
   {
+    CacheLine *rmv;
     // clockPointer will store the most recently used page (which means the
     // next page is the oldest page)
     clockPointer = clockPointer->next;
@@ -344,22 +348,14 @@ public:
     clockPointer->prev->next = c;
     c->next = clockPointer->next;
     c->prev = clockPointer->prev;
+    rmv = clockPointer;
     clockPointer = c;
+    map_evict(rmv);
   }
 
-  void insertFIFO(CacheLine *c, bool at_capacity)
+  void insertFIFO(CacheLine *c)
   {
-    if (at_capacity)
-    {
-      CacheLine *rmv = tail;
-      tail = tail->prev;
-      deleteNode(rmv);
-    }
-
-    c->next = head->next;
-    c->next->prev = c;
-    head->next = c;
-    c->prev = head;
+    insertFront(c, head);
   }
 };
 
