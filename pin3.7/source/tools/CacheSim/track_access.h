@@ -3,7 +3,7 @@
 unsigned long total_num_accesses = 0, num_misses = 0, num_hits = 0;
 
 #define RAM_SIZE 1073741824 // DEFINE RAM SIZE (IN BYTES) HERE
-#define EVICTION_POLICY 3   // SET EVICTION POLICY HERE
+#define EVICTION_POLICY LRU   // SET EVICTION POLICY HERE
 
 FunctionalCache *ram;
 bool dirty_evict;

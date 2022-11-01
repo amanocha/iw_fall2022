@@ -24,6 +24,15 @@
 
 using namespace std;
 
+enum Replacement_Policy 
+{
+  LRU,
+  TBD,
+  LFU,
+  CLOCK,
+  FIFO
+};
+
 struct CacheLine
 {
   uint64_t addr;
@@ -49,7 +58,7 @@ public:
   int line_size;
   unsigned policy;
 
-  CacheSet(int size, int cache_line_size, unsigned int eviction_policy)
+  CacheSet(int size, int cache_line_size, Replacement_Policy eviction_policy)
   {
     associativity = size;
     line_size = cache_line_size;
@@ -63,7 +72,7 @@ public:
       c = &entries[i];
       freeEntries.push_back(c);
     }
-    if (policy == 3)
+    if (policy == CLOCK)
     {
       // set up circular linked list for Clock algo
       head = new CacheLine;
@@ -102,19 +111,19 @@ public:
 
       // policy 3 == Clock Algo, 4 == FIFO
       // only want to delete if policy is not Clock Algo or FIFO
-      if (policy != 3 && policy != 4)
+      if (policy == LRU || policy == TBD || policy == LFU)
         deleteNode(c);
 
-      if (policy == 0)
+      if (policy == LRU)
       {
         insertFront(c, head);
       }
-      else if (policy == 1)
+      else if (policy == TBD)
       {
         if (c->freq >= associativity / 2)
           insertFront(c, head);
       }
-      else if (policy == 2)
+      else if (policy == LFU)
       {
         insertLFU(c, head);
       }
@@ -142,13 +151,18 @@ public:
 
     if (eviction)
     {
+      cout << "EVICTION NEEDED\n";
       // Clock policy does not currently know which node to delete
-      if (policy == 0 || policy == 1 || policy == 2 || policy == 4) 
+      if (policy == LRU || policy == TBD || policy == LFU || policy == FIFO) 
       {
         c = tail->prev; // LRU, LFU
         assert(c != head);
         map_evict(c, dirtyEvict, evictedAddr, evictedOffset);
         deleteNode(c);
+      }
+      else if (policy == CLOCK)
+      {
+        swapClock(c, dirtyEvict, evictedAddr, evictedOffset); // evict and insert by Clock (second chance)
       }
     }
     else
@@ -162,20 +176,17 @@ public:
     c->offset = offset;
     c->dirty = !isLoad; // write-back cache insertion
 
-    if (policy == 0)
+    if (policy == LRU)
       insertFront(c, head); // LRU for insertion
-    else if (policy == 1)
+    else if (policy == TBD)
       insertHalf(c, head); // insert halfway into set
-    else if (policy == 2)
+    else if (policy == LFU)
       insertLFU(c, head); // insert by frequency
-    else if (policy == 3)
+    else if (policy == CLOCK)
     {
-      if (eviction)
-        swapClock(c, dirtyEvict, evictedAddr, evictedOffset); // evict and insert by Clock (second chance)
-      else
-        insertClock(c); // just insert by Clock
+      insertClock(c); // just insert by Clock
     }
-    else if (policy == 4)
+    else if (policy == FIFO)
     {
       // handle Fifo
       insertFIFO(c);
@@ -369,7 +380,7 @@ public:
   int log_line_size;
   vector<CacheSet *> sets;
 
-  FunctionalCache(unsigned long size, int assoc, int line_size, unsigned int eviction_policy)
+  FunctionalCache(unsigned long size, int assoc, int line_size, Replacement_Policy eviction_policy)
   {
     cache_line_size = line_size;
     line_count = size / cache_line_size;
