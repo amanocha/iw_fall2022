@@ -24,6 +24,12 @@
 
 using namespace std;
 
+/**
+* TODOs
+* - Figure out TBD policy (gets stuck in infinite loop on all_miss_policy, but fine on all_hit_policy)
+* - Clock algo throws seg fault on all_miss_policy, works fine on all_hit_policy
+*/
+
 enum Replacement_Policy 
 {
   LRU,
@@ -151,7 +157,7 @@ public:
 
     if (eviction)
     {
-      cout << "EVICTION NEEDED\n";
+      // cout << "EVICTION NEEDED\n";
       // Clock policy does not currently know which node to delete
       if (policy == LRU || policy == TBD || policy == LFU || policy == FIFO) 
       {
