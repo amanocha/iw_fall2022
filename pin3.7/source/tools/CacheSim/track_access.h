@@ -7,8 +7,8 @@ unsigned long total_num_accesses = 0, num_misses = 0, num_hits = 0;
 // 0.25 GB = 268435456 bytes
 // 0.125 GB = 134217728 bytes
 // 0.0625 GB = 67108864 bytes
-#define RAM_SIZE 67108864 // DEFINE RAM SIZE (IN BYTES) HERE
-#define EVICTION_POLICY LRU_HALF   // SET EVICTION POLICY HERE
+#define RAM_SIZE 1073741824 // DEFINE RAM SIZE (IN BYTES) HERE
+#define EVICTION_POLICY CLOCK   // SET EVICTION POLICY HERE
 
 FunctionalCache *ram;
 bool dirty_evict;

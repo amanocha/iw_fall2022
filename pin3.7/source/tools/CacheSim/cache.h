@@ -160,7 +160,7 @@ public:
     {
       if (!printed_once)
       {
-        cout << "EVICTION NEEDED\n";
+        cout << "EVICTIONS NEEDED\n";
         printed_once = true;
       }
       // Clock policy does not currently know which node to delete
@@ -171,10 +171,10 @@ public:
         map_evict(c, dirtyEvict, evictedAddr, evictedOffset);
         deleteNode(c);
       }
-      else if (policy == CLOCK)
-      {
-        swapClock(c, dirtyEvict, evictedAddr, evictedOffset); // evict and insert by Clock (second chance)
-      }
+      // else if (policy == CLOCK)
+      // {
+      //   swapClock(c, dirtyEvict, evictedAddr, evictedOffset); // evict and insert by Clock (second chance)
+      // }
     }
     else
     { // there is space, no need for eviction
@@ -182,10 +182,14 @@ public:
       freeEntries.pop_back();
     }
 
-    addr_map[address] = c; // insert into address map
-    c->addr = address;
-    c->offset = offset;
-    c->dirty = !isLoad; // write-back cache insertion
+    if (!(policy == CLOCK && eviction))
+    {
+      assert(c != NULL);
+      addr_map[address] = c; // insert into address map
+      c->addr = address;
+      c->offset = offset;
+      c->dirty = !isLoad; // write-back cache insertion
+    }
 
     if (policy == LRU)
       insertFront(c, head); // LRU for insertion
@@ -195,7 +199,12 @@ public:
       insertLFU(c, head); // insert by frequency
     else if (policy == CLOCK)
     {
-      insertClock(c); // just insert by Clock
+      if (eviction)
+      {
+        swapClock(address, offset, isLoad, dirtyEvict, evictedAddr, evictedOffset); // evict and insert by Clock (second chance)
+      }
+      else
+        insertClock(c); // just insert by Clock
     }
     else if (policy == FIFO)
     {
@@ -349,12 +358,11 @@ public:
 
   /**
    * This method iterates through the circular linked list (i.e. the "clock")
-   * and finds the first node with a clear dirty bit. For a given node, if it's
+   * and finds the first node with a clear dirty bit. Forßa given node, if it's
    * dirty bit is set, we clear it and continue.
    */
-  void swapClock(CacheLine *c, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset)
+  void swapClock(uint64_t address, uint64_t offset, bool isLoad, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset)
   {
-    CacheLine *rmv;
     // clockPointer will store the most recently used page (which means the
     // next page is the oldest page)
     clockPointer = clockPointer->next;
@@ -365,14 +373,16 @@ public:
       clockPointer = clockPointer->next;
     }
 
-    // swap out curr for c
-    clockPointer->next->prev = c;
-    clockPointer->prev->next = c;
-    c->next = clockPointer->next;
-    c->prev = clockPointer->prev;
-    rmv = clockPointer;
-    clockPointer = c;
-    map_evict(rmv, dirtyEvict, evictedAddr, evictedOffset);
+    // remove evicted node from address map
+    map_evict(clockPointer, dirtyEvict, evictedAddr, evictedOffset);
+
+    // swap info in clockPointer
+    clockPointer->addr = address;
+    clockPointer->offset = offset;
+    clockPointer->dirty = !isLoad;
+
+    // add updated into back into address map
+    addr_map[address] = clockPointer;
   }
 
   void insertFIFO(CacheLine *c)
