@@ -56,6 +56,7 @@ public:
   CacheLine *head;
   CacheLine *tail;
   CacheLine *clockPointer;
+  bool printed_once = false;
   CacheLine *entries;
   std::vector<CacheLine *> freeEntries;
   std::unordered_map<uint64_t, CacheLine *> addr_map;
@@ -157,7 +158,11 @@ public:
 
     if (eviction)
     {
-      // cout << "EVICTION NEEDED\n";
+      if (!printed_once)
+      {
+        cout << "EVICTION NEEDED\n";
+        printed_once = true;
+      }
       // Clock policy does not currently know which node to delete
       if (policy == LRU || policy == LRU_HALF || policy == LFU || policy == FIFO) 
       {
