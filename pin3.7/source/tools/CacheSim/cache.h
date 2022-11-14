@@ -22,6 +22,8 @@
 #define L2_ASSOC 6
 #define MAX_FREQ 255
 
+#define TAU_WSCLOCK 5
+
 using namespace std;
 
 /**
@@ -36,7 +38,8 @@ enum Replacement_Policy
   LRU_HALF,
   LFU,
   CLOCK,
-  FIFO
+  FIFO,
+  WS_CLOCK
 };
 
 struct CacheLine
@@ -48,6 +51,7 @@ struct CacheLine
   bool dirty = false;
 
   unsigned short freq = 0;
+  unsigned short timer = 0;
 };
 
 class CacheSet
@@ -79,7 +83,7 @@ public:
       c = &entries[i];
       freeEntries.push_back(c);
     }
-    if (policy == CLOCK)
+    if (policy == CLOCK || policy = WS_CLOCK)
     {
       // set up circular linked list for Clock algo
       head = new CacheLine;
@@ -134,6 +138,11 @@ public:
       {
         insertLFU(c, head);
       }
+      else if (policy == WS_CLOCK)
+      {
+        tick_WSClock();
+        c->timer = 0;
+      }
 
       if (!isLoad)
         c->dirty = true;
@@ -171,10 +180,6 @@ public:
         map_evict(c, dirtyEvict, evictedAddr, evictedOffset);
         deleteNode(c);
       }
-      // else if (policy == CLOCK)
-      // {
-      //   swapClock(c, dirtyEvict, evictedAddr, evictedOffset); // evict and insert by Clock (second chance)
-      // }
     }
     else
     { // there is space, no need for eviction
@@ -182,7 +187,7 @@ public:
       freeEntries.pop_back();
     }
 
-    if (!(policy == CLOCK && eviction))
+    if (!((policy == CLOCK || policy == WS_CLOCK) && eviction))
     {
       assert(c != NULL);
       addr_map[address] = c; // insert into address map
@@ -197,11 +202,15 @@ public:
       insertHalf(c, head); // insert halfway into set
     else if (policy == LFU)
       insertLFU(c, head); // insert by frequency
-    else if (policy == CLOCK)
+    else if (policy == CLOCK || policy == WS_CLOCK)
     {
-      if (eviction)
+      if (eviction && policy == CLOCK)
       {
         swapClock(address, offset, isLoad, dirtyEvict, evictedAddr, evictedOffset); // evict and insert by Clock (second chance)
+      }
+      else if (eviction && policy == WS_CLOCK)
+      {
+        // swapWSClock
       }
       else
         insertClock(c); // just insert by Clock
@@ -383,6 +392,46 @@ public:
 
     // add updated into back into address map
     addr_map[address] = clockPointer;
+  }
+
+  // Similar to swapClock(), but this implementation considers the timer
+  void swapWSClock(uint64_t address, uint64_t offset, bool isLoad, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset)
+  {
+    // clockPointer will store the most recently used page (which means the
+    // next page is the oldest page)
+    CacheLine *first = clockPointer;
+    clockPointer = clockPointer->next;
+
+  // add check for not the first entry here (in the case where all timers are less than tau)
+    while (clockPointer->dirty || clockPointer == head || clockPointer == tail || clockPointer->freq < TAU_WSCLOCK)
+    {
+      clockPointer->dirty = false;
+      clockPointer = clockPointer->next;
+    }
+
+    // remove evicted node from address map
+    map_evict(clockPointer, dirtyEvict, evictedAddr, evictedOffset);
+
+    // swap info in clockPointer
+    clockPointer->addr = address;
+    clockPointer->offset = offset;
+    clockPointer->dirty = !isLoad;
+    
+    // set timer to 0
+    clockPointer->timer = 0;
+
+    // add updated into back into address map
+    addr_map[address] = clockPointer;
+  }
+
+  void tick_WSClock()
+  {
+    CacheLine *curr = head->next;
+    while (curr != tail)
+    {
+      curr->timer++;
+      curr = curr->next;
+    }
   }
 
   void insertFIFO(CacheLine *c)

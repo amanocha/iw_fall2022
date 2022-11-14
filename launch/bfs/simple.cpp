@@ -21,6 +21,26 @@
 using namespace std;
 extern int errno;
 
+void print_regions(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long *out_wl) {
+  vector<string> data_names{"NODE_ARRAY", "EDGE_ARRAY", "PROP_ARRAY", "IN_WL", "OUT_WL"};
+  vector<pair<uint64_t, uint64_t>> mem_regions;
+  
+  mem_regions.push_back(make_pair((uint64_t) G.node_array, (uint64_t)(G.node_array+G.nodes+1)));
+  mem_regions.push_back(make_pair((uint64_t) G.edge_array, (uint64_t)(G.edge_array+G.edges)));
+  mem_regions.push_back(make_pair((uint64_t) ret, (uint64_t)(ret+G.nodes)));
+  mem_regions.push_back(make_pair((uint64_t) in_wl, (uint64_t)(in_wl+G.nodes*2)));
+  mem_regions.push_back(make_pair((uint64_t) out_wl, (uint64_t)(out_wl+G.nodes*2)));
+
+  uint64_t start, end;
+  cout << "\nMemory Regions:" << endl;
+  for (unsigned int i = 0; i < mem_regions.size(); i++) {
+    start = (uint64_t)(mem_regions[i].first/SUPERPAGE_SIZE); // align to page
+    end = (uint64_t)(mem_regions[i].second+SUPERPAGE_SIZE-1)/SUPERPAGE_SIZE;
+    cout << data_names[i] << ": starting base = " << hex << start << ", ending base = " << end << endl;
+  }
+  cout << endl;
+}
+
 int main(int argc, char** argv) {
   string graph_fname;
   csr_graph G;
@@ -33,9 +53,27 @@ int main(int argc, char** argv) {
   if (argc >= 3) start_seed = atoi(argv[2]);
   else start_seed = 0; 
 
+  Replacement_Policy policy = LRU;
+  string policy_name = argv[2];
+  if (policy_name == "LRU")
+    policy = LRU;
+  else if (policy_name == "LRU_HALF")
+    policy = LRU_HALF;
+  else if (policy_name == "LFU")
+    policy = LFU;
+  else if (policy_name == "CLOCK")
+    policy = CLOCK;
+  else if (policy_name == "FIFO")
+    policy = FIFO;
+  else
+    cout << "Policy not recognized\n";
+
   // Initialize data and create irregular data
   G = parse_bin_files(graph_fname, 0, 1);
-  init_kernel(G.nodes, start_seed, &in_index, &out_index, &in_wl, &out_wl, &ret);
+  init_kernel_policy(G.nodes, start_seed, &in_index, &out_index, &in_wl, &out_wl, &ret, policy);
+
+  // print data structure regions 
+  print_regions(G, ret, in_wl, out_wl);
 
   // Execute app
   printf("\n\nstarting kernel\n");

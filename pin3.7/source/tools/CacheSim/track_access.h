@@ -1,6 +1,6 @@
 #include "cache.h"
 
-unsigned long total_num_accesses = 0, num_misses = 0, num_hits = 0;
+unsigned long total_num_accesses = 0, num_misses = 0, num_hits = 0, num_evicts = 0;
 
 // 1 GB = 1073741824 bytes
 // 0.5 GB = 536870912 bytes
@@ -8,7 +8,7 @@ unsigned long total_num_accesses = 0, num_misses = 0, num_hits = 0;
 // 0.125 GB = 134217728 bytes
 // 0.0625 GB = 67108864 bytes
 #define RAM_SIZE 1073741824 // DEFINE RAM SIZE (IN BYTES) HERE
-#define EVICTION_POLICY CLOCK   // SET EVICTION POLICY HERE
+#define EVICTION_POLICY LRU   // SET EVICTION POLICY HERE
 
 FunctionalCache *ram;
 bool dirty_evict;
@@ -22,6 +22,15 @@ void init_cache()
     evicted_offset = 0;
 
     ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, EVICTION_POLICY);
+}
+
+void init_cache(Replacement_Policy eval_pol)
+{
+    dirty_evict = false;
+    evicted_tag = -1;
+    evicted_offset = 0;
+
+    ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, eval_pol);
 }
 
 void init_cache_manual(unsigned int ram_size, unsigned int page_size, Replacement_Policy eviction_policy)
