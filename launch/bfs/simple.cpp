@@ -24,12 +24,18 @@ extern int errno;
 void print_regions(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long *out_wl) {
   vector<string> data_names{"NODE_ARRAY", "EDGE_ARRAY", "PROP_ARRAY", "IN_WL", "OUT_WL"};
   vector<pair<uint64_t, uint64_t>> mem_regions;
-  
-  mem_regions.push_back(make_pair((uint64_t) G.node_array, (uint64_t)(G.node_array+G.nodes+1)));
-  mem_regions.push_back(make_pair((uint64_t) G.edge_array, (uint64_t)(G.edge_array+G.edges)));
-  mem_regions.push_back(make_pair((uint64_t) ret, (uint64_t)(ret+G.nodes)));
-  mem_regions.push_back(make_pair((uint64_t) in_wl, (uint64_t)(in_wl+G.nodes*2)));
-  mem_regions.push_back(make_pair((uint64_t) out_wl, (uint64_t)(out_wl+G.nodes*2)));
+
+  node_array_bounds = make_pair((uint64_t) G.node_array, (uint64_t)(G.node_array+G.nodes+1));
+  edge_array_bounds = make_pair((uint64_t) G.edge_array, (uint64_t)(G.edge_array+G.edges));
+  prop_array_bounds = make_pair((uint64_t) ret, (uint64_t)(ret+G.nodes));
+  in_wl_bounds = make_pair((uint64_t) in_wl, (uint64_t)(in_wl+G.nodes*2));
+  out_wl_bounds = make_pair((uint64_t) out_wl, (uint64_t)(out_wl+G.nodes*2));
+
+  mem_regions.push_back(node_array_bounds);
+  mem_regions.push_back(edge_array_bounds);
+  mem_regions.push_back(prop_array_bounds);
+  mem_regions.push_back(in_wl_bounds);
+  mem_regions.push_back(out_wl_bounds);
 
   uint64_t start, end;
   cout << "\nMemory Regions:" << endl;
@@ -65,6 +71,8 @@ int main(int argc, char** argv) {
     policy = CLOCK;
   else if (policy_name == "FIFO")
     policy = FIFO;
+  else if (policy_name == "WS_CLOCK")
+    policy = WS_CLOCK;
   else
     cout << "Policy not recognized\n";
 

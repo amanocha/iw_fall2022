@@ -83,7 +83,7 @@ public:
       c = &entries[i];
       freeEntries.push_back(c);
     }
-    if (policy == CLOCK || policy = WS_CLOCK)
+    if (policy == CLOCK || policy == WS_CLOCK)
     {
       // set up circular linked list for Clock algo
       head = new CacheLine;
@@ -210,7 +210,7 @@ public:
       }
       else if (eviction && policy == WS_CLOCK)
       {
-        // swapWSClock
+        swapWSClock(address, offset, isLoad, dirtyEvict, evictedAddr, evictedOffset);
       }
       else
         insertClock(c); // just insert by Clock
@@ -394,19 +394,20 @@ public:
     addr_map[address] = clockPointer;
   }
 
-  // Similar to swapClock(), but this implementation considers the timer
+  // Similar to swapClock(), but this implementation considers the timer and tau
   void swapWSClock(uint64_t address, uint64_t offset, bool isLoad, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset)
   {
-    // clockPointer will store the most recently used page (which means the
-    // next page is the oldest page)
+    bool checkFreq = true;
     CacheLine *first = clockPointer;
     clockPointer = clockPointer->next;
 
-  // add check for not the first entry here (in the case where all timers are less than tau)
-    while (clockPointer->dirty || clockPointer == head || clockPointer == tail || clockPointer->freq < TAU_WSCLOCK)
+    // add check for not the first entry here (in the case where all timers are less than tau)
+    while (clockPointer->dirty || clockPointer == head || clockPointer == tail || (checkFreq && clockPointer->timer < TAU_WSCLOCK))
     {
       clockPointer->dirty = false;
       clockPointer = clockPointer->next;
+      if (clockPointer == first)
+        checkFreq = false;
     }
 
     // remove evicted node from address map
