@@ -40,8 +40,8 @@ void print_regions(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsign
   uint64_t start, end;
   cout << "\nMemory Regions:" << endl;
   for (unsigned int i = 0; i < mem_regions.size(); i++) {
-    start = (uint64_t)(mem_regions[i].first/SUPERPAGE_SIZE); // align to page
-    end = (uint64_t)(mem_regions[i].second+SUPERPAGE_SIZE-1)/SUPERPAGE_SIZE;
+    start = (uint64_t)(mem_regions[i].first); // align to page
+    end = (uint64_t)(mem_regions[i].second);
     cout << data_names[i] << ": starting base = " << hex << start << ", ending base = " << end << endl;
   }
   cout << endl;
@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
   // Parse arguments
   assert(argc >= 2);
   graph_fname = argv[1];
-  if (argc >= 3) start_seed = atoi(argv[2]);
+  if (argc >= 5) start_seed = atoi(argv[4]);
   else start_seed = 0; 
 
   Replacement_Policy policy = LRU;

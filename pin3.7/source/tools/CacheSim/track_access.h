@@ -14,13 +14,15 @@ uint64_t node_start, node_end, edge_start, edge_end, prop_start, prop_end, in_wl
 // 0.25 GB = 268435456 bytes
 // 0.125 GB = 134217728 bytes
 // 0.0625 GB = 67108864 bytes
-#define RAM_SIZE 1073741824 // DEFINE RAM SIZE (IN BYTES) HERE
+// 1/512 GB = 0.001953125 GB = 2097152 bytes
+#define RAM_SIZE 67108864 // DEFINE RAM SIZE (IN BYTES) HERE
 #define EVICTION_POLICY LRU   // SET EVICTION POLICY HERE
 
 FunctionalCache *ram;
 bool dirty_evict;
 int64_t evicted_tag;
 uint64_t evicted_offset;
+int limit = 10;
 
 void init_cache()
 {
@@ -38,20 +40,21 @@ void init_cache(Replacement_Policy eval_pol)
     evicted_offset = 0;
 
     ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, eval_pol);
-    node_start = (uint64_t)(node_array_bounds.first/SUPERPAGE_SIZE);
-    node_end = (uint64_t)(node_array_bounds.second+SUPERPAGE_SIZE-1)/SUPERPAGE_SIZE;
 
-    edge_start = (uint64_t)(edge_array_bounds.first/SUPERPAGE_SIZE);
-    edge_end = (uint64_t)(edge_array_bounds.second+SUPERPAGE_SIZE-1)/SUPERPAGE_SIZE;
+    node_start = (uint64_t)(node_array_bounds.first);
+    node_end = (uint64_t)(node_array_bounds.second);
 
-    prop_start = (uint64_t)(prop_array_bounds.first/SUPERPAGE_SIZE);
-    prop_end = (uint64_t)(prop_array_bounds.second+SUPERPAGE_SIZE-1)/SUPERPAGE_SIZE;
+    edge_start = (uint64_t)(edge_array_bounds.first);
+    edge_end = (uint64_t)(edge_array_bounds.second);
 
-    in_wl_start = (uint64_t)(in_wl_bounds.first/SUPERPAGE_SIZE);
-    in_wl_end = (uint64_t)(in_wl_bounds.second+SUPERPAGE_SIZE-1)/SUPERPAGE_SIZE;
+    prop_start = (uint64_t)(prop_array_bounds.first);
+    prop_end = (uint64_t)(prop_array_bounds.second);
 
-    out_wl_start = (uint64_t)(out_wl_bounds.first/SUPERPAGE_SIZE);
-    out_wl_end = (uint64_t)(out_wl_bounds.second+SUPERPAGE_SIZE-1)/SUPERPAGE_SIZE;
+    in_wl_start = (uint64_t)(in_wl_bounds.first);
+    in_wl_end = (uint64_t)(in_wl_bounds.second);
+
+    out_wl_start = (uint64_t)(out_wl_bounds.first);
+    out_wl_end = (uint64_t)(out_wl_bounds.second);
 }
 
 void init_cache_manual(unsigned int ram_size, unsigned int page_size, Replacement_Policy eviction_policy)
@@ -96,7 +99,13 @@ void track_access(uint64_t vaddr)
         ram->insert(page * PAGE_SIZE, true, &dirty_evict, &evicted_tag, &evicted_offset);
         if (evicted_tag != -1)
         {
-            evicted_addr = evicted_tag * PAGE_SIZE + evicted_offset / PAGE_SIZE;
+            // evicted_addr = evicted_tag * PAGE_SIZE + evicted_offset / PAGE_SIZE;
+            evicted_addr = evicted_tag * PAGE_SIZE + evicted_offset;
+            if (limit > 0)
+            {
+                cout << "evicted addr = " << evicted_addr << "\n";
+                limit--;
+            }
             count_evictions(evicted_addr);
             evicted.push_back(evicted_addr); // track evicted address?
         }
