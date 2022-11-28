@@ -26,11 +26,6 @@
 
 using namespace std;
 
-/**
-* TODOs
-* - Figure out LRU_HALF policy (gets stuck in infinite loop on all_miss_policy, but fine on all_hit_policy)
-* - Clock algo throws seg fault on all_miss_policy, works fine on all_hit_policy
-*/
 
 enum Replacement_Policy 
 {
@@ -160,10 +155,10 @@ public:
     }
   }
 
-  void insert(uint64_t address, uint64_t offset, bool isLoad, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset)
+  void insert(uint64_t address, uint64_t offset, bool isLoad, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset, bool is2M=false)
   {
     CacheLine *c = addr_map[address];
-    bool eviction = freeEntries.size() == 0;
+    bool eviction = is2M ? (freeEntries.size() < 512) : (freeEntries.size() == 0);
 
     if (eviction)
     {
@@ -171,6 +166,10 @@ public:
       {
         cout << "EVICTIONS NEEDED\n";
         printed_once = true;
+      }
+      if (is2M)
+      {
+        cout << "ERROR: not behaving as expected (for now)\n";
       }
       // Clock policy does not currently know which node to delete
       if (policy == LRU || policy == LRU_HALF || policy == LFU || policy == FIFO) 
@@ -184,7 +183,19 @@ public:
     else
     { // there is space, no need for eviction
       c = freeEntries.back();
-      freeEntries.pop_back();
+      if (is2M)
+      {
+        // 1 huge page = 512 regular pages
+        cout << "Huge page brought in\n";
+        for (int i = 0; i < 512; i++)
+        {
+          freeEntries.pop_back();
+        }
+      }
+      else
+      {
+        freeEntries.pop_back();
+      }
     }
 
     if (!((policy == CLOCK || policy == WS_CLOCK) && eviction))
@@ -220,6 +231,21 @@ public:
       // handle Fifo
       insertFIFO(c);
     }
+  }
+
+  // this method can be used to count the number of regular sized pages that can be evicted
+  // if the corresponding huge page is brought in
+  int count_pages(CacheLine *c, uint64_t tag)
+  {
+    // TODO
+    return 0;
+  }
+
+  // this method can be used to discard 4kb pages matching this tag, in the case that the corresponding
+  // huge page is about to be brought in
+  void discard_pages(CacheLine *c, uint64_t tag)
+  {
+    // TODO
   }
 
   // helper method to clear entry from address map
@@ -501,7 +527,7 @@ public:
     int64_t evictedTag = -1;
     *dirtyEvict = false;
 
-    c->insert(tag, offset, isLoad, dirtyEvict, &evictedTag, evictedOffset);
+    c->insert(tag, offset, isLoad, dirtyEvict, &evictedTag, evictedOffset, is2M);
     if (print)
       cout << "Inserting " << address << "; tag = " << tag << ", setid = " << setid << ", offset = " << offset << endl;
 

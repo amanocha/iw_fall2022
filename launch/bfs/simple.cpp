@@ -25,24 +25,47 @@ void print_regions(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsign
   vector<string> data_names{"NODE_ARRAY", "EDGE_ARRAY", "PROP_ARRAY", "IN_WL", "OUT_WL"};
   vector<pair<uint64_t, uint64_t>> mem_regions;
 
-  node_array_bounds = make_pair((uint64_t) G.node_array, (uint64_t)(G.node_array+G.nodes+1));
-  edge_array_bounds = make_pair((uint64_t) G.edge_array, (uint64_t)(G.edge_array+G.edges));
-  prop_array_bounds = make_pair((uint64_t) ret, (uint64_t)(ret+G.nodes));
-  in_wl_bounds = make_pair((uint64_t) in_wl, (uint64_t)(in_wl+G.nodes*2));
-  out_wl_bounds = make_pair((uint64_t) out_wl, (uint64_t)(out_wl+G.nodes*2));
+  // node_array_bounds = make_pair((uint64_t) G.node_array, (uint64_t)(G.node_array+G.nodes+1));
+  // edge_array_bounds = make_pair((uint64_t) G.edge_array, (uint64_t)(G.edge_array+G.edges));
+  // prop_array_bounds = make_pair((uint64_t) ret, (uint64_t)(ret+G.nodes));
+  // in_wl_bounds = make_pair((uint64_t) in_wl, (uint64_t)(in_wl+G.nodes*2));
+  // out_wl_bounds = make_pair((uint64_t) out_wl, (uint64_t)(out_wl+G.nodes*2));
 
-  mem_regions.push_back(node_array_bounds);
-  mem_regions.push_back(edge_array_bounds);
-  mem_regions.push_back(prop_array_bounds);
-  mem_regions.push_back(in_wl_bounds);
-  mem_regions.push_back(out_wl_bounds);
+  mem_regions.push_back(make_pair((uint64_t) G.node_array, (uint64_t)(G.node_array+G.nodes+1)));
+  mem_regions.push_back(make_pair((uint64_t) G.edge_array, (uint64_t)(G.edge_array+G.edges)));
+  mem_regions.push_back(make_pair((uint64_t) ret, (uint64_t)(ret+G.nodes)));
+  mem_regions.push_back(make_pair((uint64_t) in_wl, (uint64_t)(in_wl+G.nodes*2)));
+  mem_regions.push_back(make_pair((uint64_t) out_wl, (uint64_t)(out_wl+G.nodes*2)));
 
   uint64_t start, end;
   cout << "\nMemory Regions:" << endl;
   for (unsigned int i = 0; i < mem_regions.size(); i++) {
     start = (uint64_t)(mem_regions[i].first); // align to page
     end = (uint64_t)(mem_regions[i].second);
-    cout << data_names[i] << ": starting base = " << hex << start << ", ending base = " << end << endl;
+    // cout << (uint64_t) G.node_array << " " << (uint64_t)(G.node_array+G.nodes+1) << endl;
+    // cout << data_names[i] << ": starting base = " << hex << start << ", ending base = " << end << endl;
+    cout << data_names[i] << ": starting base = " << start << ", ending base = " << end << endl;
+
+    if (i == 0) {
+      node_start = start;
+      node_end = end;
+    }
+    else if (i == 1) {
+      edge_start = start;
+      edge_end = end;
+    }
+    else if (i == 2) {
+      prop_start = start;
+      prop_end = end;
+    }
+    else if (i == 3) {
+      in_wl_start = start;
+      in_wl_end = end;
+    }
+    else if (i == 4) {
+      out_wl_start = start;
+      out_wl_end = end;
+    }
   }
   cout << endl;
 }

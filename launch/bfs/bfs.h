@@ -85,11 +85,11 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
         unsigned long edge_index = G.edge_array[e];
         track_access((uint64_t)&G.edge_array[e]);
         unsigned long v = ret[edge_index]; // PROBLEM
-        track_access((uint64_t)&ret[edge_index]);
+        track_access((uint64_t)&ret[edge_index], true);
         if (v == -1)
         {
           ret[edge_index] = hop;
-          track_access((uint64_t)&ret[edge_index]);
+          track_access((uint64_t)&ret[edge_index], true);
           unsigned long index = *out_index;
           *out_index = *out_index + 1;
           out_wl[index] = edge_index;
