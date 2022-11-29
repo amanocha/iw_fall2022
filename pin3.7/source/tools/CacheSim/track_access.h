@@ -96,6 +96,10 @@ void track_access(uint64_t vaddr, bool is2mb=false)
 
     /********** START: cache logic **********/
     hit = ram->access(page * PAGE_SIZE, true, is2mb);
+    if (!hit && is2mb)
+    {
+        cout << "Expected huge page and missed\n";
+    }
     if (!hit)
     { // miss
         ram->insert(page * PAGE_SIZE, true, &dirty_evict, &evicted_tag, &evicted_offset, is2mb);

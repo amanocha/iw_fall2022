@@ -44,6 +44,7 @@ struct CacheLine
   CacheLine *prev;
   CacheLine *next;
   bool dirty = false;
+  bool isHugePage = false;
 
   unsigned short freq = 0;
   unsigned short timer = 0;
@@ -167,14 +168,14 @@ public:
         cout << "EVICTIONS NEEDED\n";
         printed_once = true;
       }
-      if (is2M)
-      {
-        cout << "ERROR: not behaving as expected (for now)\n";
-      }
-      // Clock policy does not currently know which node to delete
+      // Decide which page to evict (do NOT allow huge page evictions)
       if (policy == LRU || policy == LRU_HALF || policy == LFU || policy == FIFO) 
       {
         c = tail->prev; // LRU, LFU
+        while (c->isHugePage)
+        {
+          c = c->prev;
+        }
         assert(c != head);
         map_evict(c, dirtyEvict, evictedAddr, evictedOffset);
         deleteNode(c);
@@ -205,6 +206,7 @@ public:
       c->addr = address;
       c->offset = offset;
       c->dirty = !isLoad; // write-back cache insertion
+      c->isHugePage = is2M;
     }
 
     if (policy == LRU)
@@ -371,6 +373,7 @@ public:
 
   void deleteNode(CacheLine *c)
   {
+    assert(!c->isHugePage);
     assert(c->next);
     assert(c->prev);
     c->prev->next = c->next;
