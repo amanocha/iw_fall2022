@@ -42,21 +42,6 @@ void init_cache(Replacement_Policy eval_pol)
     ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, eval_pol);
     cout << "Running with huge pages for return (prop) array ONLY -- all else is 4kb page\n";
     cout << "RAM size (in bytes): " << RAM_SIZE << "\n";
-
-    // node_start = (uint64_t)(node_array_bounds.first);
-    // node_end = (uint64_t)(node_array_bounds.second);
-
-    // edge_start = (uint64_t)(edge_array_bounds.first);
-    // edge_end = (uint64_t)(edge_array_bounds.second);
-
-    // prop_start = (uint64_t)(prop_array_bounds.first);
-    // prop_end = (uint64_t)(prop_array_bounds.second);
-
-    // in_wl_start = (uint64_t)(in_wl_bounds.first);
-    // in_wl_end = (uint64_t)(in_wl_bounds.second);
-
-    // out_wl_start = (uint64_t)(out_wl_bounds.first);
-    // out_wl_end = (uint64_t)(out_wl_bounds.second);
 }
 
 void init_cache_manual(unsigned int ram_size, unsigned int page_size, Replacement_Policy eviction_policy)
@@ -96,10 +81,10 @@ void track_access(uint64_t vaddr, bool is2mb=false)
 
     /********** START: cache logic **********/
     hit = ram->access(page * PAGE_SIZE, true, is2mb);
-    if (!hit && is2mb)
-    {
-        cout << "Expected huge page and missed\n";
-    }
+    // if (!hit && is2mb)
+    // {
+    //     cout << "Expected huge page and missed\n";
+    // }
     if (!hit)
     { // miss
         ram->insert(page * PAGE_SIZE, true, &dirty_evict, &evicted_tag, &evicted_offset, is2mb);

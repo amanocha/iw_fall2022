@@ -77,14 +77,14 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
 
       unsigned long start = G.node_array[node];   // starting position
       unsigned long end = G.node_array[node + 1]; // ending position
-      track_access((uint64_t)&G.node_array[node]); // do i even need these?
+      track_access((uint64_t)&G.node_array[node]);
       track_access((uint64_t)&G.node_array[node + 1]);
 
       for (unsigned long e = start; e < end; e++)
       {
         unsigned long edge_index = G.edge_array[e];
         track_access((uint64_t)&G.edge_array[e]);
-        unsigned long v = ret[edge_index]; // PROBLEM
+        unsigned long v = ret[edge_index]; // this is the problematic access
         track_access((uint64_t)&ret[edge_index], true);
         if (v == -1)
         {

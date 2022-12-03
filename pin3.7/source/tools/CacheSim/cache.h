@@ -60,6 +60,8 @@ public:
   CacheLine *entries;
   std::vector<CacheLine *> freeEntries;
   std::unordered_map<uint64_t, CacheLine *> addr_map;
+  std::unordered_map<uint64_t, uint64_t> acvs;
+  std::set<uint64_t> hugepages;
 
   unsigned int associativity;
   int line_size;
@@ -187,7 +189,7 @@ public:
       if (is2M)
       {
         // 1 huge page = 512 regular pages
-        cout << "Huge page brought in\n";
+        // cout << "Huge page brought in\n";
         for (int i = 0; i < 512; i++)
         {
           freeEntries.pop_back();
@@ -373,7 +375,6 @@ public:
 
   void deleteNode(CacheLine *c)
   {
-    assert(!c->isHugePage);
     assert(c->next);
     assert(c->prev);
     c->prev->next = c->next;
