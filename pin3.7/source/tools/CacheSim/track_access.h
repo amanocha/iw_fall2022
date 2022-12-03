@@ -79,6 +79,11 @@ void count(uint64_t address, bool evicted=false)
     }
 }
 
+void print_pages_end()
+{
+    ram->print_page_counts();
+}
+
 void track_access(uint64_t vaddr, bool is2mb=false)
 {
     uint64_t page, evicted_addr;

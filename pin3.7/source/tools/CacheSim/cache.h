@@ -22,6 +22,10 @@
 #define L2_ASSOC 6
 #define MAX_FREQ 255
 
+// Bounds for CUSTOM promotion policy
+#define TAU_PROMOTION 250
+#define HUGEPAGE_LIMIT 100
+
 #define TAU_WSCLOCK 5
 
 using namespace std;
@@ -35,6 +39,14 @@ enum Replacement_Policy
   CLOCK,
   FIFO,
   WS_CLOCK
+};
+
+enum Promotion_Policy
+{
+  NA,
+  HAWKEYE,
+  INGENS,
+  CUSTOM
 };
 
 struct CacheLine
@@ -60,14 +72,15 @@ public:
   CacheLine *entries;
   std::vector<CacheLine *> freeEntries;
   std::unordered_map<uint64_t, CacheLine *> addr_map;
-  std::unordered_map<uint64_t, uint64_t> acvs;
+  std::unordered_map<uint64_t, int> acvs;
   std::set<uint64_t> hugepages;
+  int access_cycles = TAU_PROMOTION;
 
   unsigned int associativity;
   int line_size;
   unsigned policy;
 
-  CacheSet(int size, int cache_line_size, Replacement_Policy eviction_policy)
+  CacheSet(int size, int cache_line_size, Replacement_Policy eviction_policy, Promotion_Policy promotion_policy=NA)
   {
     associativity = size;
     line_size = cache_line_size;
@@ -142,6 +155,12 @@ public:
         c->timer = 0;
       }
 
+      // TODO
+      // add ACV updating here for each promotion policy
+      
+      // also add periodic "upgrades" every n accesses to promote/demote pages using the policy
+      // this effectively behaves as the daemon thread for promotions
+
       if (!isLoad)
         c->dirty = true;
 
@@ -186,6 +205,9 @@ public:
     else
     { // there is space, no need for eviction
       c = freeEntries.back();
+
+      // this should always be false for Hawkeye policy (and other applicaton-agnostic protocols)
+      // only do this if you have a user-aware protocol, so they can manually promote a huge page
       if (is2M)
       {
         // 1 huge page = 512 regular pages
@@ -469,6 +491,40 @@ public:
   {
     insertFront(c, head);
   }
+
+  void countAllPages()
+  {
+    unsigned long num_hugepages = 0;
+    unsigned long num_regpages = 0;
+    CacheLine *curr = head->next;
+    while (curr != tail)
+    {
+      if (curr->isHugePage)
+        num_hugepages++;
+      else
+        num_regpages++;
+      
+      curr = curr->next;
+    }
+    printf("--- page info ---\n");
+    printf("number of hugepages = %lu\n", num_hugepages);
+    printf("number of 4kb pages = %lu\n", num_regpages);
+  }
+
+  bool isMappedToHugePage(uint64_t addr)
+  {
+    return hugepages.count(addr);
+  }
+
+  void update_acv_access(uint64_t addr)
+  {
+    acvs[addr]++;
+  }
+
+  // TODO
+  // add a function to go through all pages and remove the 4kb ones that are
+  // going to be included in a hugepage promotion
+
 };
 
 class FunctionalCache
@@ -481,7 +537,7 @@ public:
   int log_line_size;
   vector<CacheSet *> sets;
 
-  FunctionalCache(unsigned long size, int assoc, int line_size, Replacement_Policy eviction_policy)
+  FunctionalCache(unsigned long size, int assoc, int line_size, Replacement_Policy eviction_policy, Promotion_Policy promotion_policy=NA)
   {
     cache_line_size = line_size;
     line_count = size / cache_line_size;
@@ -491,9 +547,15 @@ public:
 
     for (int i = 0; i < set_count; i++)
     {
-      CacheSet *set = new CacheSet(assoc, cache_line_size, eviction_policy);
+      CacheSet *set = new CacheSet(assoc, cache_line_size, eviction_policy, promotion_policy);
       sets.push_back(set);
     }
+  }
+
+  void print_page_counts()
+  {
+    CacheSet *c = sets.at(0); // RAM simulator only has 1 set (fully associative)
+    c->countAllPages();
   }
 
   uint64_t extract(int max, int min, uint64_t address) // inclusive
@@ -508,6 +570,10 @@ public:
 
   bool access(uint64_t address, bool isLoad, bool is2M = false, bool print = false)
   {
+    // bool is2mb = false;
+    // TODO
+    // add check here to see if this is a hugepage access
+    // (setid is always gonna be 0)
     int log_pofs = is2M ? log2(SUPERPAGE_SIZE) : log_line_size;
     uint64_t offset = extract(log_pofs - 1, 0, address);
     uint64_t setid = extract(log_set_count + log_pofs - 1, log_pofs, address);

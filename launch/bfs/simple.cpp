@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
   // Parse arguments
   assert(argc >= 2);
   graph_fname = argv[1];
-  if (argc >= 5) start_seed = atoi(argv[4]);
+  if (argc >= 6) start_seed = atoi(argv[5]);
   else start_seed = 0; 
 
   Replacement_Policy policy = LRU;
@@ -90,6 +90,19 @@ int main(int argc, char** argv) {
     policy = WS_CLOCK;
   else
     cout << "Policy not recognized\n";
+  
+  Promotion_Policy promotion_policy = NA;
+  string promo_name = argv[3];
+  if (promo_name == "NA")
+    promotion_policy = NA;
+  else if (promo_name == "HAWKEYE")
+    promotion_policy = HAWKEYE;
+  else if (promo_name == "INGENS")
+    promotion_policy = INGENS;
+  else if (promo_name == "CUSTOM")
+    promotion_policy = CUSTOM;
+  else
+    cout << "Promotion policy not recognized\n";
 
   // Initialize data and create irregular data
   G = parse_bin_files(graph_fname, 0, 1);

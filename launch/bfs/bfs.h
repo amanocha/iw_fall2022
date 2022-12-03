@@ -125,4 +125,5 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
   printf("prop array accesses = %lu\n", prop_array_accesses);
   printf("in wl accesses = %lu\n", in_wl_accesses);
   printf("out wl accesses = %lu\n", out_wl_accesses);
+  print_pages_end();
 }
