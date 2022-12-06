@@ -106,7 +106,7 @@ int main(int argc, char** argv) {
 
   // Initialize data and create irregular data
   G = parse_bin_files(graph_fname, 0, 1);
-  init_kernel_policy(G.nodes, start_seed, &in_index, &out_index, &in_wl, &out_wl, &ret, policy);
+  init_kernel_policy(G.nodes, start_seed, &in_index, &out_index, &in_wl, &out_wl, &ret, policy, promotion_policy);
 
   // print data structure regions 
   print_regions(G, ret, in_wl, out_wl);

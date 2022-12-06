@@ -12,7 +12,7 @@
 #include "../../utils/split_huge_page.h"
 #include "../../pin3.7/source/tools/CacheSim/track_access.h"
 
-void init_kernel_policy(int num_nodes, int start_seed, unsigned long *in_index, unsigned long *out_index, unsigned long **in_wl, unsigned long **out_wl, unsigned long **ret, Replacement_Policy policy)
+void init_kernel_policy(int num_nodes, int start_seed, unsigned long *in_index, unsigned long *out_index, unsigned long **in_wl, unsigned long **out_wl, unsigned long **ret, Replacement_Policy policy, Promotion_Policy promotion_policy)
 {
   *ret = (unsigned long *)malloc(sizeof(unsigned long) * num_nodes);
   *in_wl = (unsigned long *)malloc(sizeof(unsigned long) * num_nodes * 2);
@@ -34,7 +34,7 @@ void init_kernel_policy(int num_nodes, int start_seed, unsigned long *in_index, 
     (*ret)[i] = 0;
   }
 
-  init_cache(policy);
+  init_cache(policy, promotion_policy);
 }
 
 void init_kernel(int num_nodes, int start_seed, unsigned long *in_index, unsigned long *out_index, unsigned long **in_wl, unsigned long **out_wl, unsigned long **ret)
@@ -85,11 +85,13 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
         unsigned long edge_index = G.edge_array[e];
         track_access((uint64_t)&G.edge_array[e]);
         unsigned long v = ret[edge_index]; // this is the problematic access
-        track_access((uint64_t)&ret[edge_index], true);
+        // track_access((uint64_t)&ret[edge_index], true);
+        track_access((uint64_t)&ret[edge_index]);
         if (v == -1)
         {
           ret[edge_index] = hop;
-          track_access((uint64_t)&ret[edge_index], true);
+          // track_access((uint64_t)&ret[edge_index], true);
+          track_access((uint64_t)&ret[edge_index]);
           unsigned long index = *out_index;
           *out_index = *out_index + 1;
           out_wl[index] = edge_index;

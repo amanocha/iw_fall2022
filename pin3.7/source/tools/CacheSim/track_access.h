@@ -29,14 +29,15 @@ void init_cache()
     ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, EVICTION_POLICY);
 }
 
-void init_cache(Replacement_Policy eval_pol)
+void init_cache(Replacement_Policy eval_pol, Promotion_Policy promo_pol)
 {
     dirty_evict = false;
     evicted_tag = -1;
     evicted_offset = 0;
 
-    ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, eval_pol);
-    cout << "Running with huge pages for return (prop) array ONLY -- all else is 4kb page\n";
+    ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, eval_pol, promo_pol);
+    // cout << "Running with huge pages for return (prop) array ONLY -- all else is 4kb page\n";
+    cout << "Running with CUSTOM promotion policy\n";
     cout << "RAM size (in bytes): " << RAM_SIZE << "\n";
 }
 
@@ -105,7 +106,7 @@ void track_access(uint64_t vaddr, bool is2mb=false)
     count(page * PAGE_SIZE, false);
     if (!hit)
     { // miss
-        ram->insert(page * PAGE_SIZE, true, &dirty_evict, &evicted_tag, &evicted_offset, is2mb);
+        ram->insert(page * PAGE_SIZE, true, &dirty_evict, &evicted_tag, &evicted_offset);
         if (evicted_tag != -1)
         {
             // evicted_addr = evicted_tag * PAGE_SIZE + evicted_offset / PAGE_SIZE;
