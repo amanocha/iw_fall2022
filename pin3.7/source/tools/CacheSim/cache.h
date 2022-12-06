@@ -1,4 +1,5 @@
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
 #include <vector>
 #include <set>
@@ -21,12 +22,11 @@
 #define L1_ASSOC 4
 #define L2_ASSOC 6
 #define MAX_FREQ 255
+#define TAU_WSCLOCK 5
 
 // Bounds for CUSTOM promotion policy
-#define TAU_PROMOTION 250
-#define HUGEPAGE_LIMIT 100
-
-#define TAU_WSCLOCK 5
+#define TAU_PROMOTION 5000
+#define HUGEPAGE_LIMIT 250
 
 using namespace std;
 
@@ -73,7 +73,7 @@ public:
   std::vector<CacheLine *> freeEntries;
   std::unordered_map<uint64_t, CacheLine *> addr_map;
   std::unordered_map<uint64_t, int> acvs;
-  std::set<uint64_t> hugepages;
+  std::unordered_set<uint64_t> hugepages;
   int access_cycles = TAU_PROMOTION;
 
   unsigned int associativity;
@@ -125,9 +125,16 @@ public:
   // access() is called only when we have a page hit
   // this is to reorder the nodes (for LFU, LRU, etc.)
   // NOT meant to evict or delete any pages
-  bool access(uint64_t address, uint64_t offset, bool isLoad)
+  bool access(uint64_t address, uint64_t hugepage_address, uint64_t offset, bool isLoad)
   {
-    CacheLine *c = addr_map[address];
+    access_cycles--;
+    if (access_cycles < 0)
+    {
+      rebalance_hugepages();
+      access_cycles = TAU_PROMOTION;
+    }
+
+    CacheLine *c = isMappedToHugePage(hugepage_address) ? addr_map[hugepage_address] : addr_map[address];
     if (c)
     { // Hit
 
@@ -157,6 +164,14 @@ public:
 
       // TODO
       // add ACV updating here for each promotion policy
+      if (acvs.count(hugepage_address) == 0)
+      {
+        acvs[hugepage_address] = 1;
+      }
+      else
+      {
+        acvs[hugepage_address]++;
+      }
       
       // also add periodic "upgrades" every n accesses to promote/demote pages using the policy
       // this effectively behaves as the daemon thread for promotions
@@ -174,6 +189,83 @@ public:
     else
     {
       return false;
+    }
+  }
+
+  void rebalance_hugepages()
+  {
+    // PART 1
+    // find the regions that are meant to be promoted
+    std::vector<pair<uint64_t, int>> top_n(HUGEPAGE_LIMIT);
+    std::partial_sort_copy(acvs.begin(), acvs.end(), top_n.begin(), top_n.end(),
+                          [](pair<uint64_t, int> const& l,
+                              pair<uint64_t, int> const& r)
+                          {
+                              return l.second > r.second;
+                          });
+    std::unordered_set<uint64_t> next_hugepages;
+    std::unordered_map<uint64_t, int> next_acvs;
+    for (std::pair<uint64_t, int> p : top_n)
+    {
+      uint64_t hugepage_addr = p.first;
+      next_hugepages.insert(hugepage_addr);
+      hugepages.erase(hugepage_addr);
+    }
+
+    // PART 2
+    // evict and demote hugepages that did not meet the cutoff
+    for (auto p : hugepages)
+    {
+      CacheLine *to_delete = addr_map[p];
+      for (int i = 0; i < 512; i++)
+      {
+        freeEntries.push_back(to_delete);
+      }
+      deleteNode(to_delete);
+
+      // delete nodes that will be brought in when huge pages are added
+      remove_4kb_pages(p);
+    }    
+
+    // PART 3
+    // insert huge page regions
+    for (auto p : next_hugepages)
+    {
+      bool isLoad, *dirtyEvict;
+      int64_t *evictedAddr, evictedTag = -1;
+      uint64_t *evictedOffset, offset;
+      insert(p, 0, isLoad, dirtyEvict, &evictedTag, evictedOffset, true);
+    }
+    hugepages = next_hugepages;
+    acvs.clear();
+  }
+
+  // function to go through all pages and remove the 4kb ones that are
+  // going to be included in a hugepage promotion
+  void remove_4kb_pages(uint64_t hugepage_addr)
+  {
+    CacheLine *c = head->next;
+    while (c != tail)
+    {
+      if (c->isHugePage)
+      {
+        c = c->next;
+        continue;
+      }
+
+      // check if 4kb tag will be contained in hugepage
+      bool to_evict = ((c->addr >> 9) == hugepage_addr);
+      if (to_evict)
+      {
+        CacheLine *temp = c;
+        c = c->next;
+        map_evict(temp);
+        deleteNode(temp);
+      }
+      else
+      {
+        c = c->next;
+      }
     }
   }
 
@@ -267,13 +359,6 @@ public:
     return 0;
   }
 
-  // this method can be used to discard 4kb pages matching this tag, in the case that the corresponding
-  // huge page is about to be brought in
-  void discard_pages(CacheLine *c, uint64_t tag)
-  {
-    // TODO
-  }
-
   // helper method to clear entry from address map
   void map_evict(CacheLine *c, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset)
   {
@@ -281,6 +366,11 @@ public:
     *evictedAddr = c->addr;
     *evictedOffset = c->offset;
     *dirtyEvict = c->dirty;
+  }
+
+  void map_evict(CacheLine *c)
+  {
+    addr_map.erase(c->addr);
   }
 
   void evict(uint64_t address, bool *dirtyEvict)
@@ -419,7 +509,7 @@ public:
 
   /**
    * This method iterates through the circular linked list (i.e. the "clock")
-   * and finds the first node with a clear dirty bit. Forßa given node, if it's
+   * and finds the first node with a clear dirty bit. For a given node, if it's
    * dirty bit is set, we clear it and continue.
    */
   void swapClock(uint64_t address, uint64_t offset, bool isLoad, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset)
@@ -513,17 +603,13 @@ public:
 
   bool isMappedToHugePage(uint64_t addr)
   {
-    return hugepages.count(addr);
+    return (hugepages.count((addr >> 9)) > 0);
   }
 
-  void update_acv_access(uint64_t addr)
+  void update_acv_access(uint64_t hugepage_addr)
   {
-    acvs[addr]++;
+    acvs[hugepage_addr]++;
   }
-
-  // TODO
-  // add a function to go through all pages and remove the 4kb ones that are
-  // going to be included in a hugepage promotion
 
 };
 
@@ -570,17 +656,23 @@ public:
 
   bool access(uint64_t address, bool isLoad, bool is2M = false, bool print = false)
   {
-    // bool is2mb = false;
-    // TODO
-    // add check here to see if this is a hugepage access
-    // (setid is always gonna be 0)
-    int log_pofs = is2M ? log2(SUPERPAGE_SIZE) : log_line_size;
+
+    // HUGEPAGE TAG
+    int log_pofs_hp = log2(SUPERPAGE_SIZE);
+    uint64_t offset_hp = extract(log_pofs_hp - 1, 0, address);
+    uint64_t setid_hp = extract(log_set_count + log_pofs_hp - 1, log_pofs_hp, address);
+    uint64_t tag_hp = extract(63, log_set_count + log_pofs_hp, address);
+
+    // REGULAR PAGE TAG
+    int log_pofs = log_line_size;
     uint64_t offset = extract(log_pofs - 1, 0, address);
     uint64_t setid = extract(log_set_count + log_pofs - 1, log_pofs, address);
     uint64_t tag = extract(63, log_set_count + log_pofs, address);
-    CacheSet *c = sets.at(setid);
 
-    bool res = c->access(tag, offset, isLoad);
+
+    CacheSet *c = sets.at(0);
+
+    bool res = c->access(tag, tag_hp, offset, isLoad);
     if (print)
       cout << "Accessing " << address << "; tag = " << tag << ", setid = " << setid << ", offset = " << offset << " --> " << res << endl;
 

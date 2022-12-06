@@ -49,9 +49,9 @@ void init_cache_manual(unsigned int ram_size, unsigned int page_size, Replacemen
     ram = new FunctionalCache(ram_size, ram_size / page_size, page_size, eviction_policy);
 }
 
-void count(uint64_t address, bool evicted=false)
+void count(uint64_t evicted, bool evicted_bool)
 {
-    if (evicted)
+    if (evicted_bool)
     {
         if (evicted >= node_start && evicted <= node_end)
             node_array_evicts++;
@@ -102,7 +102,7 @@ void track_access(uint64_t vaddr, bool is2mb=false)
     // {
     //     cout << "Expected huge page and missed\n";
     // }
-    count(page * PAGE_SIZE);
+    count(page * PAGE_SIZE, false);
     if (!hit)
     { // miss
         ram->insert(page * PAGE_SIZE, true, &dirty_evict, &evicted_tag, &evicted_offset, is2mb);
