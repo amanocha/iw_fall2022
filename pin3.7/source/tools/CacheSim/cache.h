@@ -235,6 +235,10 @@ public:
     print_map(acvs);
     acvs.clear();
 
+    // TODO
+    // seg fault happening around here
+    // print the vector of pairs above
+
     for (std::pair<uint64_t, int> p : top_n)
     {
       uint64_t hugepage_addr = p.first;
@@ -299,7 +303,11 @@ public:
 
   void insert(uint64_t address, uint64_t offset, bool isLoad, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset, bool is2M=false)
   {
-    CacheLine *c = addr_map[address];
+    CacheLine *c;
+    if (promotion_policy != CUSTOM)
+    {
+      c = addr_map[address];
+    }
     // bool eviction = is2M ? (freeHugepageEntries.size() < 0) : (freeEntries.size() == 0);
     bool eviction = is2M ? (num_available_pages < 512) : (num_available_pages == 0);
 
