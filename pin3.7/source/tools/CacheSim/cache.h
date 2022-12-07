@@ -219,6 +219,14 @@ public:
     }
   }
 
+  void print_vector_pairs(std::vector<pair<uint64_t, int>> output)
+  {
+    for(int i = 0; i < output.size(); i++)
+    {
+      cout << output[i].first << ", " << output[i].second << endl;
+    }
+  }
+
   void rebalance_hugepages()
   {
     // PART 1
@@ -238,6 +246,7 @@ public:
     // TODO
     // seg fault happening around here
     // print the vector of pairs above
+    print_vector_pairs(top_n);
 
     for (std::pair<uint64_t, int> p : top_n)
     {
