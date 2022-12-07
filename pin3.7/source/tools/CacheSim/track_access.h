@@ -98,7 +98,7 @@ void track_access(uint64_t vaddr, bool is2mb=false)
     // get physical page?
 
     /********** START: cache logic **********/
-    hit = ram->access(page * PAGE_SIZE, true, is2mb);
+    hit = ram->access(page * PAGE_SIZE, true);
     // if (!hit && is2mb)
     // {
     //     cout << "Expected huge page and missed\n";

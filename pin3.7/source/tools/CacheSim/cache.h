@@ -75,6 +75,7 @@ public:
   std::unordered_map<uint64_t, int> acvs;
   std::unordered_set<uint64_t> hugepages;
   int access_cycles = TAU_PROMOTION;
+  int access_counter = 0;
   int num_available_pages; // tracks the current number of available 4kb pages
 
   unsigned int associativity;
@@ -147,12 +148,13 @@ public:
   bool access(uint64_t address, uint64_t hugepage_address, uint64_t offset, bool isLoad)
   {
     // cout << "accesses are still happening " << access_cycles << "\n";
+    access_counter++;
     if (promotion_policy == CUSTOM)
     {
       access_cycles--;
       if (access_cycles < 0)
       {
-        cout << "rebalancing hugepages\n";
+        // cout << "rebalancing hugepages\n";
         rebalance_hugepages();
         access_cycles = TAU_PROMOTION;
       }
@@ -227,8 +229,18 @@ public:
     }
   }
 
+  void print_set(std::unordered_set<uint64_t> myset)
+  {
+    cout << "Printing unordered_set\n";
+    for (uint64_t a : myset)
+    {
+      cout << a << endl;
+    }
+  }
+
   void rebalance_hugepages()
   {
+    // cout << "ID: " << access_counter << endl;
     // PART 1
     // find the regions that are meant to be promoted
     int size = (HUGEPAGE_LIMIT > acvs.size()) ? acvs.size() : HUGEPAGE_LIMIT;
@@ -239,14 +251,14 @@ public:
                           {
                               return l.second > r.second;
                           });
-    std::unordered_set<uint64_t> next_hugepages;
-    print_map(acvs);
+    std::unordered_set<uint64_t> next_hugepages = std::unordered_set<uint64_t>();
+    // print_map(acvs);
     acvs.clear();
 
     // TODO
     // seg fault happening around here
     // print the vector of pairs above
-    print_vector_pairs(top_n);
+    // print_vector_pairs(top_n);
 
     for (std::pair<uint64_t, int> p : top_n)
     {
@@ -254,17 +266,22 @@ public:
       next_hugepages.insert(hugepage_addr);
       hugepages.erase(hugepage_addr);
     }
+    // cout << "creating sets worked\n";
+    // print_set(hugepages);
+    // print_set(next_hugepages);
 
     // PART 2
     // evict and demote hugepages that did not meet the cutoff
-    for (auto p : hugepages)
+    for (uint64_t p : hugepages)
     {
+      // cout << "evicting address: " << p << endl;
       evict(p);
     }
-
+    // cout << "hugepage evictions worked\n";
     // PART 3
     // delete nodes that will be brought in when huge pages are added
     remove_4kb_pages(next_hugepages);
+    // cout << "4kb evictions worked\n";
 
     // PART 4
     // insert huge page regions
@@ -273,11 +290,16 @@ public:
       bool isLoad, *dirtyEvict;
       int64_t *evictedAddr, evictedTag = -1;
       uint64_t *evictedOffset, offset;
-      insert(p, 0, isLoad, dirtyEvict, &evictedTag, evictedOffset, true);
+      if (addr_map.count(p) == 0)
+      {
+        insert(p, 0, isLoad, dirtyEvict, &evictedTag, evictedOffset, true);
+      }
     }
     hugepages = next_hugepages;
-    cout << "done rebalancing hugepages\n";
-    print_map(addr_map);
+    // cout << "done rebalancing hugepages\n";
+    // cout << "START ADDR_MAP ----------\n";
+    // print_map(addr_map);
+    // cout << "END ADDR_MAP ----------\n";
   }
 
   // function to go through all pages and remove the 4kb ones that are
@@ -313,7 +335,11 @@ public:
   void insert(uint64_t address, uint64_t offset, bool isLoad, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset, bool is2M=false)
   {
     CacheLine *c;
-    if (promotion_policy != CUSTOM)
+    if (promotion_policy == CUSTOM)
+    {
+      c = new CacheLine;
+    }
+    else
     {
       c = addr_map[address];
     }
@@ -327,11 +353,11 @@ public:
         cout << "EVICTIONS NEEDED\n";
         printed_once = true;
       }
-      if (promotion_policy == CUSTOM && is2M)
-      {
-        cout << "need evictions to promote hugepage\n";
-      }
-      // Decide which page to evict (do NOT allow huge page evictions)
+      // if (promotion_policy == CUSTOM && is2M)
+      // {
+      //   cout << "need evictions to promote hugepage; only " << num_available_pages << " available" << endl;
+      // }
+      // Decide which page to evict
       if (policy == LRU || policy == LRU_HALF || policy == LFU || policy == FIFO) 
       {
         if (promotion_policy == CUSTOM)
@@ -341,7 +367,6 @@ public:
           {
             evict_LRU_node();
           }
-          c = new CacheLine;
         }
         else
         {
@@ -360,7 +385,6 @@ public:
     { // there is space, no need for eviction
       if (promotion_policy == CUSTOM)
       {
-        c = new CacheLine;
         num_available_pages -= is2M ? 512 : 1;
       }
       else
@@ -373,16 +397,16 @@ public:
       // only do this if you have a user-aware protocol, so they can manually promote a huge page
     }
 
-    if (!((policy == CLOCK || policy == WS_CLOCK) && eviction))
-    {
-      assert(c != NULL);
-      addr_map[address] = c; // insert into address map
-      c->addr = address;
-      c->offset = offset;
-      c->dirty = !isLoad; // write-back cache insertion
-      c->isHugePage = is2M;
+    // if (!((policy == CLOCK || policy == WS_CLOCK) && eviction))
+    // {
+    assert(c != NULL);
+    addr_map[address] = c; // insert into address map
+    c->addr = address;
+    c->offset = offset;
+    c->dirty = !isLoad; // write-back cache insertion
+    c->isHugePage = is2M;
       // std::cout << "c->isHugePage = " << c->isHugePage << "\n";
-    }
+    // }
 
     if (policy == LRU)
       insertFront(c, head); // LRU for insertion
@@ -421,7 +445,7 @@ public:
     if (c->isHugePage)
     {
       num_available_pages += 512;
-      cout << "evicted a hugepage\n";
+      // cout << "evicted a hugepage with address " << c->addr << endl;
     }
     else
     {
@@ -466,10 +490,15 @@ public:
   
   void evict(uint64_t address)
   {
+    // cout << "EVICT address: " << address << " from:\n";
+    // cout << "START ADDR_MAP ----------\n";
+    // print_map(addr_map);
+    // cout << "END ADDR_MAP ----------\n";
+    assert(addr_map.count(address) > 0);
     CacheLine *c = addr_map[address];
+    assert(c != NULL);
     assert(c != head);
     assert(c != tail);
-
     addr_map.erase(c->addr);
     deleteNode(c);
     if (promotion_policy == CUSTOM)
@@ -701,7 +730,11 @@ public:
 
   bool isMappedToHugePage(uint64_t hugepage_addr)
   {
-    return (hugepages.count(hugepage_addr) > 0);
+    // cout << "isMappedToHugePage\n";
+    // print_map(addr_map);
+    // print_map(hugepages);
+    assert(hugepages.count(hugepage_addr) == addr_map.count(hugepage_addr));
+    return (addr_map.count(hugepage_addr) > 0);
   }
 
   void update_acv_access(uint64_t hugepage_addr)

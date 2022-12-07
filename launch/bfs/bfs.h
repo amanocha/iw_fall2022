@@ -113,8 +113,8 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
   printf("\nmemory accesses = %lu\n", total_num_accesses);
   printf("cache hits = %lu\n", num_hits);
   printf("cache misses = %lu\n", num_misses);
-  unsigned long rate = (100 * num_misses / total_num_accesses);
-  printf("miss rate = %lu\n", rate);
+  float rate = (100.0 * ((float) num_misses) / ((float) total_num_accesses));
+  printf("miss rate = %.8f\n", rate);
   printf("--- eviction info by data structure ---\n");
   printf("node array evictions = %lu\n", node_array_evicts);
   printf("edge array evictions = %lu\n", edge_array_evicts);
