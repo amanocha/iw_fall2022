@@ -26,7 +26,8 @@
 
 // Bounds for CUSTOM promotion policy
 #define TAU_PROMOTION 5000
-#define HUGEPAGE_LIMIT 50
+#define HUGEPAGE_LIMIT 0
+#define FREQ_LOWER_BOUND 5
 
 using namespace std;
 
@@ -76,7 +77,7 @@ public:
   std::unordered_set<uint64_t> hugepages;
   int access_cycles = TAU_PROMOTION;
   int access_counter = 0;
-  int num_available_pages; // tracks the current number of available 4kb pages
+  unsigned long num_available_pages = 0, total_inserts = 0, total_evictions = 0; // tracks the current number of available 4kb pages
 
   unsigned int associativity;
   int line_size;
@@ -92,10 +93,11 @@ public:
     promotion_policy = promotion_pol;
     cout << "policy = " << policy << "\n";
     cout << "promotion policy = " << promotion_policy << "\n";
+    cout << "number of available 4kb pages = " << num_available_pages << endl;
 
     CacheLine *c;
     entries = new CacheLine[associativity];
-    if (promotion_policy != CUSTOM)
+    if (promotion_policy != CUSTOM || true)
     {
       for (unsigned int i = 0; i < associativity; i++)
       {
@@ -159,7 +161,16 @@ public:
         access_cycles = TAU_PROMOTION;
       }
     }
-    CacheLine *c = isMappedToHugePage(hugepage_address) ? addr_map[hugepage_address] : addr_map[address];
+    CacheLine *c;
+    if (promotion_policy == CUSTOM)
+    {
+      c = isMappedToHugePage(hugepage_address) ? addr_map[hugepage_address] : addr_map[address];
+      // c = addr_map[address];
+    }
+    else
+    {
+      c = addr_map[address];
+    }
     if (c)
     { // Hit
 
@@ -240,10 +251,13 @@ public:
 
   void rebalance_hugepages()
   {
-    // cout << "ID: " << access_counter << endl;
+    if (HUGEPAGE_LIMIT == 0)
+      return;
+    
     // PART 1
     // find the regions that are meant to be promoted
     int size = (HUGEPAGE_LIMIT > acvs.size()) ? acvs.size() : HUGEPAGE_LIMIT;
+    
     std::vector<pair<uint64_t, int>> top_n(size);
     std::partial_sort_copy(acvs.begin(), acvs.end(), top_n.begin(), top_n.end(),
                           [](pair<uint64_t, int> const& l,
@@ -262,10 +276,14 @@ public:
 
     for (std::pair<uint64_t, int> p : top_n)
     {
-      uint64_t hugepage_addr = p.first;
-      next_hugepages.insert(hugepage_addr);
-      hugepages.erase(hugepage_addr);
+      if (p.second > FREQ_LOWER_BOUND)
+      {
+        uint64_t hugepage_addr = p.first;
+        next_hugepages.insert(hugepage_addr);
+        hugepages.erase(hugepage_addr);
+      }
     }
+
     // cout << "creating sets worked\n";
     // print_set(hugepages);
     // print_set(next_hugepages);
@@ -274,18 +292,17 @@ public:
     // evict and demote hugepages that did not meet the cutoff
     for (uint64_t p : hugepages)
     {
-      // cout << "evicting address: " << p << endl;
+      assert(addr_map.count(p) != 0);
       evict(p);
     }
-    // cout << "hugepage evictions worked\n";
+    
     // PART 3
     // delete nodes that will be brought in when huge pages are added
     remove_4kb_pages(next_hugepages);
-    // cout << "4kb evictions worked\n";
 
     // PART 4
     // insert huge page regions
-    for (auto p : next_hugepages)
+    for (uint64_t p : next_hugepages)
     {
       bool isLoad, *dirtyEvict;
       int64_t *evictedAddr, evictedTag = -1;
@@ -312,39 +329,51 @@ public:
       if (c->isHugePage)
       {
         c = c->next;
-        continue;
-      }
-
-      // check if 4kb tag will be contained in hugepage
-      bool to_evict = (hugepage_addrs.count((c->addr >> 9)) > 0);
-      if (to_evict)
-      {
-        CacheLine *temp = c;
-        c = c->next;
-        map_evict(temp);
-        deleteNode(temp);
-        num_available_pages++;
       }
       else
       {
-        c = c->next;
+        // check if 4kb tag will be contained in hugepage
+        bool to_evict = (hugepage_addrs.count((c->addr >> 9)) > 0);
+        if (to_evict)
+        {
+          CacheLine *temp = c;
+          c = c->next;
+          map_evict(temp);
+          deleteNode(temp);
+          freeEntries.push_back(temp);
+          num_available_pages++;
+        }
+        else
+        {
+          c = c->next;
+        } 
       }
     }
   }
 
   void insert(uint64_t address, uint64_t offset, bool isLoad, bool *dirtyEvict, int64_t *evictedAddr, uint64_t *evictedOffset, bool is2M=false)
   {
+    total_inserts++;
     CacheLine *c;
     if (promotion_policy == CUSTOM)
     {
-      c = new CacheLine;
+      // c = new CacheLine;
     }
     else
     {
       c = addr_map[address];
     }
     // bool eviction = is2M ? (freeHugepageEntries.size() < 0) : (freeEntries.size() == 0);
-    bool eviction = is2M ? (num_available_pages < 512) : (num_available_pages == 0);
+    bool eviction;
+    if (promotion_policy == CUSTOM)
+    {
+      eviction = is2M ? (num_available_pages < 512) : (num_available_pages <= 0);
+    }
+    else
+    {
+      eviction = (freeEntries.size() == 0);
+      assert(eviction == (num_available_pages <= 0));
+    }
 
     if (eviction)
     {
@@ -363,21 +392,27 @@ public:
         if (promotion_policy == CUSTOM)
         {
           int space_needed = is2M ? 512 : 1;
+          assert(space_needed == 1);
           while (num_available_pages < space_needed)
           {
             evict_LRU_node();
+            total_evictions++;
           }
+          c = freeEntries.back();
+          freeEntries.pop_back();
+          num_available_pages -= is2M ? 512 : 1;
         }
         else
         {
           c = tail->prev; // LRU, LFU
-          while (c->isHugePage)
-          {
-            c = c->prev;
-          }
+          // while (c->isHugePage)
+          // {
+          //   c = c->prev;
+          // }
           assert(c != head);
           map_evict(c, dirtyEvict, evictedAddr, evictedOffset);
           deleteNode(c);
+          total_evictions++;
         }
       }
     }
@@ -386,11 +421,16 @@ public:
       if (promotion_policy == CUSTOM)
       {
         num_available_pages -= is2M ? 512 : 1;
+        c = freeEntries.back();
+        freeEntries.pop_back();
+        // c = new CacheLine;
       }
       else
       {
+        num_available_pages--;
         c = freeEntries.back();
         freeEntries.pop_back();
+        assert(num_available_pages == freeEntries.size());
       }
 
       // this should always be false for Hawkeye policy (and other applicaton-agnostic protocols)
@@ -444,6 +484,7 @@ public:
     assert(c != head);
     if (c->isHugePage)
     {
+      assert(false);
       num_available_pages += 512;
       // cout << "evicted a hugepage with address " << c->addr << endl;
     }
@@ -453,6 +494,7 @@ public:
     }
     map_evict(c);
     deleteNode(c);
+    freeEntries.push_back(c);
   }
 
   // this method can be used to count the number of regular sized pages that can be evicted
@@ -486,6 +528,7 @@ public:
     *dirtyEvict = c->dirty;
     deleteNode(c);
     freeEntries.push_back(c);
+    num_available_pages++;
   }
   
   void evict(uint64_t address)
@@ -499,15 +542,19 @@ public:
     assert(c != NULL);
     assert(c != head);
     assert(c != tail);
-    addr_map.erase(c->addr);
+    map_evict(c);
     deleteNode(c);
     if (promotion_policy == CUSTOM)
     {
-      num_available_pages += (c->isHugePage) ? 512 : 1;
+      assert(!c->isHugePage);
+      num_available_pages += ((c->isHugePage) ? 512 : 1);
+      freeEntries.push_back(c);
     }
     else
     {
+      num_available_pages += 1;
       freeEntries.push_back(c);
+      assert(freeEntries.size() == num_available_pages);
     }
   }
 
@@ -538,6 +585,8 @@ public:
     {
       addr_map.erase(c->addr); // removing tag
       freeEntries.push_back(c);
+      num_available_pages++;
+      assert(freeEntries.size() == num_available_pages);
       c = c->next;
       deleteNode(c->prev);
     }
@@ -716,6 +765,7 @@ public:
     CacheLine *curr = head->next;
     while (curr != tail)
     {
+      assert(curr != NULL);
       if (curr->isHugePage)
         num_hugepages++;
       else
@@ -726,30 +776,30 @@ public:
     printf("--- page info ---\n");
     printf("number of hugepages = %lu\n", num_hugepages);
     printf("number of 4kb pages = %lu\n", num_regpages);
+    printf("number of available 4kb pages = %lu\n", num_available_pages);
+    printf("total inserts = %lu\n", total_inserts);
+    printf("total evictions = %lu\n", total_evictions);
   }
 
   bool isMappedToHugePage(uint64_t hugepage_addr)
   {
-    // cout << "isMappedToHugePage\n";
-    // print_map(addr_map);
-    // print_map(hugepages);
     assert(hugepages.count(hugepage_addr) == addr_map.count(hugepage_addr));
     return (addr_map.count(hugepage_addr) > 0);
   }
 
   void update_acv_access(uint64_t hugepage_addr)
   {
-    if (promotion_policy == CUSTOM)
-    {
-      if (acvs.count(hugepage_addr) == 0)
-      {
-        acvs[hugepage_addr] = 2;
-      }
-      else
-      {
-        acvs[hugepage_addr]++;
-      }
-    }
+    // if (promotion_policy == CUSTOM)
+    // {
+    //   if (acvs.count(hugepage_addr) == 0)
+    //   {
+    //     acvs[hugepage_addr] = 2;
+    //   }
+    //   else
+    //   {
+    //     acvs[hugepage_addr]++;
+    //   }
+    // }
   }
 
 };

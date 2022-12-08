@@ -11,7 +11,8 @@ uint64_t node_start, node_end, edge_start, edge_end, prop_start, prop_end, in_wl
 // 0.125 GB = 134217728 bytes
 // 0.0625 GB = 67108864 bytes
 // 1/512 GB = 0.001953125 GB = 2097152 bytes
-#define RAM_SIZE 1073741824 // DEFINE RAM SIZE (IN BYTES) HERE
+// #define RAM_SIZE 1073741824 // DEFINE RAM SIZE (IN BYTES) HERE
+#define RAM_SIZE 67108864 // DEFINE RAM SIZE (IN BYTES) HERE
 #define EVICTION_POLICY LRU   // SET EVICTION POLICY HERE
 
 FunctionalCache *ram;
@@ -38,7 +39,8 @@ void init_cache(Replacement_Policy eval_pol, Promotion_Policy promo_pol)
     ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, eval_pol, promo_pol);
     // cout << "Running with huge pages for return (prop) array ONLY -- all else is 4kb page\n";
     cout << "Running with CUSTOM promotion policy\n";
-    cout << "RAM size (in bytes): " << RAM_SIZE << "\n";
+    cout << "RAM size (in bytes): " << RAM_SIZE << endl;
+    cout << "Hugepage Limit = " << HUGEPAGE_LIMIT << endl;
 }
 
 void init_cache_manual(unsigned int ram_size, unsigned int page_size, Replacement_Policy eviction_policy)
