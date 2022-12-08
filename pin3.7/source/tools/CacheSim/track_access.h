@@ -11,8 +11,7 @@ uint64_t node_start, node_end, edge_start, edge_end, prop_start, prop_end, in_wl
 // 0.125 GB = 134217728 bytes
 // 0.0625 GB = 67108864 bytes
 // 1/512 GB = 0.001953125 GB = 2097152 bytes
-// #define RAM_SIZE 1073741824 // DEFINE RAM SIZE (IN BYTES) HERE
-#define RAM_SIZE 67108864 // DEFINE RAM SIZE (IN BYTES) HERE
+#define RAM_SIZE 1073741824 // DEFINE RAM SIZE (IN BYTES) HERE
 #define EVICTION_POLICY LRU   // SET EVICTION POLICY HERE
 
 FunctionalCache *ram;
@@ -30,17 +29,18 @@ void init_cache()
     ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, EVICTION_POLICY);
 }
 
-void init_cache(Replacement_Policy eval_pol, Promotion_Policy promo_pol)
+void init_cache(Replacement_Policy eval_pol, Promotion_Policy promo_pol, User_Aware aware, int hugepage_lim, int tau_promotion)
 {
     dirty_evict = false;
     evicted_tag = -1;
     evicted_offset = 0;
 
-    ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, eval_pol, promo_pol);
+    ram = new FunctionalCache(RAM_SIZE, RAM_SIZE / PAGE_SIZE, PAGE_SIZE, eval_pol, promo_pol, aware, hugepage_lim, tau_promotion);
     // cout << "Running with huge pages for return (prop) array ONLY -- all else is 4kb page\n";
-    cout << "Running with CUSTOM promotion policy\n";
+    // cout << "Running with CUSTOM promotion policy\n";
+    cout << "User is " << (aware == AWARE ? "aware" : "unaware") << " of huge paging" << endl;
     cout << "RAM size (in bytes): " << RAM_SIZE << endl;
-    cout << "Hugepage Limit = " << HUGEPAGE_LIMIT << endl;
+    cout << "Hugepage Limit = " << hugepage_lim << endl;
 }
 
 void init_cache_manual(unsigned int ram_size, unsigned int page_size, Replacement_Policy eviction_policy)

@@ -25,9 +25,7 @@
 #define TAU_WSCLOCK 5
 
 // Bounds for CUSTOM promotion policy
-#define TAU_PROMOTION 5000
-#define HUGEPAGE_LIMIT 0
-#define FREQ_LOWER_BOUND 5
+#define FREQ_LOWER_BOUND 100
 
 using namespace std;
 
@@ -48,6 +46,12 @@ enum Promotion_Policy
   HAWKEYE,
   INGENS,
   CUSTOM
+};
+
+enum User_Aware
+{
+  AWARE,
+  UNAWARE
 };
 
 struct CacheLine
@@ -75,8 +79,10 @@ public:
   std::unordered_map<uint64_t, CacheLine *> addr_map;
   std::unordered_map<uint64_t, int> acvs;
   std::unordered_set<uint64_t> hugepages;
-  int access_cycles = TAU_PROMOTION;
   int access_counter = 0;
+  int hugepage_limit = 0;
+  int access_cycles = 0;
+  int tau_promotion = 0;
   unsigned long num_available_pages = 0, total_inserts = 0, total_evictions = 0; // tracks the current number of available 4kb pages
 
   unsigned int associativity;
@@ -84,15 +90,19 @@ public:
   unsigned policy;
   unsigned promotion_policy;
 
-  CacheSet(int size, int cache_line_size, Replacement_Policy eviction_policy, Promotion_Policy promotion_pol)
+  CacheSet(int size, int cache_line_size, Replacement_Policy eviction_policy, Promotion_Policy promotion_pol, User_Aware aware, int hugepage_lim, int tau_p)
   {
     associativity = size;
     num_available_pages = size;
     line_size = cache_line_size;
     policy = eviction_policy;
     promotion_policy = promotion_pol;
+    hugepage_limit = hugepage_lim;
+    tau_promotion = tau_p;
+    access_cycles = tau_promotion;
     cout << "policy = " << policy << "\n";
     cout << "promotion policy = " << promotion_policy << "\n";
+    cout << "page rebalancing every " << tau_promotion << " cycles\n";
     cout << "number of available 4kb pages = " << num_available_pages << endl;
 
     CacheLine *c;
@@ -158,7 +168,7 @@ public:
       {
         // cout << "rebalancing hugepages\n";
         rebalance_hugepages();
-        access_cycles = TAU_PROMOTION;
+        access_cycles = tau_promotion;
       }
     }
     CacheLine *c;
@@ -251,12 +261,12 @@ public:
 
   void rebalance_hugepages()
   {
-    if (HUGEPAGE_LIMIT == 0)
+    if (hugepage_limit == 0)
       return;
     
     // PART 1
     // find the regions that are meant to be promoted
-    int size = (HUGEPAGE_LIMIT > acvs.size()) ? acvs.size() : HUGEPAGE_LIMIT;
+    int size = (hugepage_limit > acvs.size()) ? acvs.size() : hugepage_limit;
     
     std::vector<pair<uint64_t, int>> top_n(size);
     std::partial_sort_copy(acvs.begin(), acvs.end(), top_n.begin(), top_n.end(),
@@ -268,11 +278,6 @@ public:
     std::unordered_set<uint64_t> next_hugepages = std::unordered_set<uint64_t>();
     // print_map(acvs);
     acvs.clear();
-
-    // TODO
-    // seg fault happening around here
-    // print the vector of pairs above
-    // print_vector_pairs(top_n);
 
     for (std::pair<uint64_t, int> p : top_n)
     {
@@ -392,7 +397,6 @@ public:
         if (promotion_policy == CUSTOM)
         {
           int space_needed = is2M ? 512 : 1;
-          assert(space_needed == 1);
           while (num_available_pages < space_needed)
           {
             evict_LRU_node();
@@ -448,6 +452,11 @@ public:
       // std::cout << "c->isHugePage = " << c->isHugePage << "\n";
     // }
 
+    if (is2M && hugepages.count(address) == 0)
+    {
+      hugepages.insert(address);
+    }
+
     if (policy == LRU)
       insertFront(c, head); // LRU for insertion
     else if (policy == LRU_HALF)
@@ -484,7 +493,6 @@ public:
     assert(c != head);
     if (c->isHugePage)
     {
-      assert(false);
       num_available_pages += 512;
       // cout << "evicted a hugepage with address " << c->addr << endl;
     }
@@ -546,7 +554,6 @@ public:
     deleteNode(c);
     if (promotion_policy == CUSTOM)
     {
-      assert(!c->isHugePage);
       num_available_pages += ((c->isHugePage) ? 512 : 1);
       freeEntries.push_back(c);
     }
@@ -626,7 +633,16 @@ public:
   // Insert such that MRU is mid-way
   void insertHalf(CacheLine *c, CacheLine *currHead)
   {
-    unsigned int idx = 0, num_entries = associativity - freeEntries.size(), end = 0;
+    unsigned int idx = 0, end = 0;
+    unsigned int num_entries;
+    if (promotion_policy == CUSTOM)
+    {
+      num_entries = associativity - num_available_pages;
+    }
+    else
+    {
+      num_entries = associativity - freeEntries.size();
+    }
     CacheLine *curr = head->next;
 
     if (num_entries == associativity)
@@ -789,17 +805,17 @@ public:
 
   void update_acv_access(uint64_t hugepage_addr)
   {
-    // if (promotion_policy == CUSTOM)
-    // {
-    //   if (acvs.count(hugepage_addr) == 0)
-    //   {
-    //     acvs[hugepage_addr] = 2;
-    //   }
-    //   else
-    //   {
-    //     acvs[hugepage_addr]++;
-    //   }
-    // }
+    if (promotion_policy == CUSTOM)
+    {
+      if (acvs.count(hugepage_addr) == 0)
+      {
+        acvs[hugepage_addr] = 1;
+      }
+      else
+      {
+        acvs[hugepage_addr]++;
+      }
+    }
   }
 
 };
@@ -814,7 +830,7 @@ public:
   int log_line_size;
   vector<CacheSet *> sets;
 
-  FunctionalCache(unsigned long size, int assoc, int line_size, Replacement_Policy eviction_policy, Promotion_Policy promotion_policy = NA)
+  FunctionalCache(unsigned long size, int assoc, int line_size, Replacement_Policy eviction_policy, Promotion_Policy promotion_policy = NA, User_Aware aware = UNAWARE, int hugepage_lim = 0, int tau_promo = 0)
   {
     cache_line_size = line_size;
     line_count = size / cache_line_size;
@@ -824,7 +840,7 @@ public:
 
     for (int i = 0; i < set_count; i++)
     {
-      CacheSet *set = new CacheSet(assoc, cache_line_size, eviction_policy, promotion_policy);
+      CacheSet *set = new CacheSet(assoc, cache_line_size, eviction_policy, promotion_policy, aware, hugepage_lim, tau_promo);
       sets.push_back(set);
     }
   }

@@ -12,7 +12,7 @@
 #include "../../utils/split_huge_page.h"
 #include "../../pin3.7/source/tools/CacheSim/track_access.h"
 
-void init_kernel_policy(int num_nodes, int start_seed, unsigned long *in_index, unsigned long *out_index, unsigned long **in_wl, unsigned long **out_wl, unsigned long **ret, Replacement_Policy policy, Promotion_Policy promotion_policy)
+void init_kernel_policy(int num_nodes, int start_seed, unsigned long *in_index, unsigned long *out_index, unsigned long **in_wl, unsigned long **out_wl, unsigned long **ret, Replacement_Policy policy, Promotion_Policy promotion_policy, User_Aware aware, int hugepage_limit, int tau_promo)
 {
   *ret = (unsigned long *)malloc(sizeof(unsigned long) * num_nodes);
   *in_wl = (unsigned long *)malloc(sizeof(unsigned long) * num_nodes * 2);
@@ -34,7 +34,7 @@ void init_kernel_policy(int num_nodes, int start_seed, unsigned long *in_index, 
     (*ret)[i] = 0;
   }
 
-  init_cache(policy, promotion_policy);
+  init_cache(policy, promotion_policy, aware, hugepage_limit, tau_promo);
 }
 
 void init_kernel(int num_nodes, int start_seed, unsigned long *in_index, unsigned long *out_index, unsigned long **in_wl, unsigned long **out_wl, unsigned long **ret)
@@ -62,7 +62,7 @@ void init_kernel(int num_nodes, int start_seed, unsigned long *in_index, unsigne
   init_cache();
 }
 
-void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long *in_index, unsigned long *out_wl, unsigned long *out_index, int tid, int num_threads)
+void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long *in_index, unsigned long *out_wl, unsigned long *out_index, int tid, int num_threads, bool user_aware = false)
 {
 
   int hop = 1;
@@ -86,12 +86,12 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
         track_access((uint64_t)&G.edge_array[e]);
         unsigned long v = ret[edge_index]; // this is the problematic access
         // track_access((uint64_t)&ret[edge_index], true);
-        track_access((uint64_t)&ret[edge_index]);
+        track_access((uint64_t)&ret[edge_index], user_aware);
         if (v == -1)
         {
           ret[edge_index] = hop;
           // track_access((uint64_t)&ret[edge_index], true);
-          track_access((uint64_t)&ret[edge_index]);
+          track_access((uint64_t)&ret[edge_index], user_aware);
           unsigned long index = *out_index;
           *out_index = *out_index + 1;
           out_wl[index] = edge_index;

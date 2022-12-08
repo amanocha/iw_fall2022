@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
   // Parse arguments
   assert(argc >= 2);
   graph_fname = argv[1];
-  if (argc >= 6) start_seed = atoi(argv[5]);
+  if (argc >= 9) start_seed = atoi(argv[8]);
   else start_seed = 0; 
 
   Replacement_Policy policy = LRU;
@@ -104,9 +104,22 @@ int main(int argc, char** argv) {
   else
     cout << "Promotion policy not recognized\n";
 
+  User_Aware aware = UNAWARE;
+  string is_aware = argv[4];
+  if (is_aware == "AWARE")
+    aware = AWARE;
+  else if (is_aware == "UNAWARE")
+    aware = UNAWARE;
+  else
+    cout << "User aware policy not recognized\n";
+
+  
+  int hugepage_limit = stoi(argv[5]);
+  int tau_promo = stoi(argv[6]);
+
   // Initialize data and create irregular data
   G = parse_bin_files(graph_fname, 0, 1);
-  init_kernel_policy(G.nodes, start_seed, &in_index, &out_index, &in_wl, &out_wl, &ret, policy, promotion_policy);
+  init_kernel_policy(G.nodes, start_seed, &in_index, &out_index, &in_wl, &out_wl, &ret, policy, promotion_policy, aware, hugepage_limit, tau_promo);
 
   // print data structure regions 
   print_regions(G, ret, in_wl, out_wl);
@@ -115,7 +128,7 @@ int main(int argc, char** argv) {
   printf("\n\nstarting kernel\n");
   start = chrono::system_clock::now();
   pin_start();
-  kernel(G, ret, in_wl, &in_index, out_wl, &out_index, 0, 1);
+  kernel(G, ret, in_wl, &in_index, out_wl, &out_index, 0, 1, (aware == AWARE));
   pin_end();
   end = std::chrono::system_clock::now();
   printf("ending kernel\n");
