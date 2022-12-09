@@ -100,7 +100,7 @@ void track_access(uint64_t vaddr, bool is2mb=false)
     // get physical page?
 
     /********** START: cache logic **********/
-    hit = ram->access(page * PAGE_SIZE, true);
+    hit = ram->access(page * PAGE_SIZE, true, is2mb);
     // if (!hit && is2mb)
     // {
     //     cout << "Expected huge page and missed\n";
@@ -108,7 +108,7 @@ void track_access(uint64_t vaddr, bool is2mb=false)
     count(page * PAGE_SIZE, false);
     if (!hit)
     { // miss
-        ram->insert(page * PAGE_SIZE, true, &dirty_evict, &evicted_tag, &evicted_offset);
+        ram->insert(page * PAGE_SIZE, true, &dirty_evict, &evicted_tag, &evicted_offset, is2mb);
         if (evicted_tag != -1)
         {
             // evicted_addr = evicted_tag * PAGE_SIZE + evicted_offset / PAGE_SIZE;

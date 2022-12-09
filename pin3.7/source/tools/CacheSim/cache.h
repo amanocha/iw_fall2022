@@ -79,6 +79,7 @@ public:
   std::unordered_map<uint64_t, CacheLine *> addr_map;
   std::unordered_map<uint64_t, int> acvs;
   std::unordered_set<uint64_t> hugepages;
+  std::unordered_set<uint64_t> distinct_hugepages;
   int access_counter = 0;
   int hugepage_limit = 0;
   int access_cycles = 0;
@@ -107,25 +108,12 @@ public:
 
     CacheLine *c;
     entries = new CacheLine[associativity];
-    if (promotion_policy != CUSTOM || true)
+    for (unsigned int i = 0; i < associativity; i++)
     {
-      for (unsigned int i = 0; i < associativity; i++)
-      {
-        c = &entries[i];
-        freeEntries.push_back(c);
-      }
+      c = &entries[i];
+      freeEntries.push_back(c);
     }
-    // if (promotion_policy == CUSTOM)
-    // {
-    //   CacheLine *c;
-    //   for (int i = 0; i < HUGEPAGE_LIMIT; i++)
-    //   {
-    //     c = freeEntries.back();
-    //     freeEntries.pop_back();
-    //     c->isHugePage = true;
-    //     freeHugepageEntries.push_back(c);
-    //   }
-    // }
+    
     if (policy == CLOCK || policy == WS_CLOCK)
     {
       // set up circular linked list for Clock algo
@@ -159,32 +147,20 @@ public:
   // NOT meant to evict or delete any pages
   bool access(uint64_t address, uint64_t hugepage_address, uint64_t offset, bool isLoad)
   {
-    // cout << "accesses are still happening " << access_cycles << "\n";
+    distinct_hugepages.insert(hugepage_address);
     access_counter++;
     if (promotion_policy == CUSTOM)
     {
       access_cycles--;
       if (access_cycles < 0)
       {
-        // cout << "rebalancing hugepages\n";
         rebalance_hugepages();
         access_cycles = tau_promotion;
       }
     }
-    CacheLine *c;
-    if (promotion_policy == CUSTOM)
-    {
-      c = isMappedToHugePage(hugepage_address) ? addr_map[hugepage_address] : addr_map[address];
-      // c = addr_map[address];
-    }
-    else
-    {
-      c = addr_map[address];
-    }
+    CacheLine *c = isMappedToHugePage(hugepage_address) ? addr_map[hugepage_address] : addr_map[address];;
     if (c)
     { // Hit
-
-      // cout << "cache hit\n";
 
       // policy 3 == Clock Algo, 4 == FIFO
       // only want to delete if policy is not Clock Algo or FIFO
@@ -289,10 +265,6 @@ public:
       }
     }
 
-    // cout << "creating sets worked\n";
-    // print_set(hugepages);
-    // print_set(next_hugepages);
-
     // PART 2
     // evict and demote hugepages that did not meet the cutoff
     for (uint64_t p : hugepages)
@@ -318,10 +290,6 @@ public:
       }
     }
     hugepages = next_hugepages;
-    // cout << "done rebalancing hugepages\n";
-    // cout << "START ADDR_MAP ----------\n";
-    // print_map(addr_map);
-    // cout << "END ADDR_MAP ----------\n";
   }
 
   // function to go through all pages and remove the 4kb ones that are
@@ -369,16 +337,7 @@ public:
       c = addr_map[address];
     }
     // bool eviction = is2M ? (freeHugepageEntries.size() < 0) : (freeEntries.size() == 0);
-    bool eviction;
-    if (promotion_policy == CUSTOM)
-    {
-      eviction = is2M ? (num_available_pages < 512) : (num_available_pages <= 0);
-    }
-    else
-    {
-      eviction = (freeEntries.size() == 0);
-      assert(eviction == (num_available_pages <= 0));
-    }
+    bool eviction = is2M ? (num_available_pages < 512) : (num_available_pages <= 0);
 
     if (eviction)
     {
@@ -387,58 +346,25 @@ public:
         cout << "EVICTIONS NEEDED\n";
         printed_once = true;
       }
-      // if (promotion_policy == CUSTOM && is2M)
-      // {
-      //   cout << "need evictions to promote hugepage; only " << num_available_pages << " available" << endl;
-      // }
       // Decide which page to evict
       if (policy == LRU || policy == LRU_HALF || policy == LFU || policy == FIFO) 
       {
-        if (promotion_policy == CUSTOM)
+        int space_needed = is2M ? 512 : 1;
+        while (num_available_pages < space_needed)
         {
-          int space_needed = is2M ? 512 : 1;
-          while (num_available_pages < space_needed)
-          {
-            evict_LRU_node();
-            total_evictions++;
-          }
-          c = freeEntries.back();
-          freeEntries.pop_back();
-          num_available_pages -= is2M ? 512 : 1;
-        }
-        else
-        {
-          c = tail->prev; // LRU, LFU
-          // while (c->isHugePage)
-          // {
-          //   c = c->prev;
-          // }
-          assert(c != head);
-          map_evict(c, dirtyEvict, evictedAddr, evictedOffset);
-          deleteNode(c);
+          evict_LRU_node();
           total_evictions++;
         }
+        c = freeEntries.back();
+        freeEntries.pop_back();
+        num_available_pages -= is2M ? 512 : 1;
       }
     }
     else
     { // there is space, no need for eviction
-      if (promotion_policy == CUSTOM)
-      {
-        num_available_pages -= is2M ? 512 : 1;
-        c = freeEntries.back();
-        freeEntries.pop_back();
-        // c = new CacheLine;
-      }
-      else
-      {
-        num_available_pages--;
-        c = freeEntries.back();
-        freeEntries.pop_back();
-        assert(num_available_pages == freeEntries.size());
-      }
-
-      // this should always be false for Hawkeye policy (and other applicaton-agnostic protocols)
-      // only do this if you have a user-aware protocol, so they can manually promote a huge page
+      num_available_pages -= is2M ? 512 : 1;
+      c = freeEntries.back();
+      freeEntries.pop_back();
     }
 
     // if (!((policy == CLOCK || policy == WS_CLOCK) && eviction))
@@ -449,7 +375,6 @@ public:
     c->offset = offset;
     c->dirty = !isLoad; // write-back cache insertion
     c->isHugePage = is2M;
-      // std::cout << "c->isHugePage = " << c->isHugePage << "\n";
     // }
 
     if (is2M && hugepages.count(address) == 0)
@@ -795,11 +720,15 @@ public:
     printf("number of available 4kb pages = %lu\n", num_available_pages);
     printf("total inserts = %lu\n", total_inserts);
     printf("total evictions = %lu\n", total_evictions);
+    int size = distinct_hugepages.size();
+    printf("number of distinct hugepages = %d\n", size);
+    float rate = 100.0 * ((float) size / (float) access_counter);
+    printf("theoretical lower bound on miss rate = %.8f\n", rate);
   }
 
   bool isMappedToHugePage(uint64_t hugepage_addr)
   {
-    assert(hugepages.count(hugepage_addr) == addr_map.count(hugepage_addr));
+    // assert(hugepages.count(hugepage_addr) == addr_map.count(hugepage_addr));
     return (addr_map.count(hugepage_addr) > 0);
   }
 
