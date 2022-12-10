@@ -97,8 +97,6 @@ void track_access(uint64_t vaddr, bool is2mb=false)
 
     page = (uint64_t)(vaddr / PAGE_SIZE); // virtual page number
 
-    // get physical page?
-
     /********** START: cache logic **********/
     hit = ram->access(page * PAGE_SIZE, true, is2mb);
     // if (!hit && is2mb)

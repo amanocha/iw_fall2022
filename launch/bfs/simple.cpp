@@ -116,6 +116,9 @@ int main(int argc, char** argv) {
   
   int hugepage_limit = stoi(argv[5]);
   int tau_promo = stoi(argv[6]);
+  string t = argv[7];
+  bool is_all_huge = (t == "ALLHUGE");
+  cout << argv[7] << endl;
 
   // Initialize data and create irregular data
   G = parse_bin_files(graph_fname, 0, 1);
@@ -128,7 +131,7 @@ int main(int argc, char** argv) {
   printf("\n\nstarting kernel\n");
   start = chrono::system_clock::now();
   pin_start();
-  kernel(G, ret, in_wl, &in_index, out_wl, &out_index, 0, 1, (aware == AWARE));
+  kernel(G, ret, in_wl, &in_index, out_wl, &out_index, 0, 1, (aware == AWARE), is_all_huge);
   pin_end();
   end = std::chrono::system_clock::now();
   printf("ending kernel\n");

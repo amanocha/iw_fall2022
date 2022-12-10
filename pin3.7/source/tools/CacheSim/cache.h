@@ -27,6 +27,10 @@
 // Bounds for CUSTOM promotion policy
 #define FREQ_LOWER_BOUND 100
 
+// Bounds for INGENS promotion policy
+// (this policy is not actually Ingens, rather a policy inspired by Ingens)
+#define INGENS_THRESHOLD 0.2f
+
 using namespace std;
 
 
@@ -77,13 +81,15 @@ public:
   CacheLine *entries;
   std::vector<CacheLine *> freeEntries;
   std::unordered_map<uint64_t, CacheLine *> addr_map;
-  std::unordered_map<uint64_t, int> acvs;
+  std::unordered_map<uint64_t, int> custom_freqs;
+  std::unordered_map<uint64_t, std::bitset<512>> ingens_acvs;
   std::unordered_set<uint64_t> hugepages;
   std::unordered_set<uint64_t> distinct_hugepages;
-  int access_counter = 0;
-  int hugepage_limit = 0;
-  int access_cycles = 0;
-  int tau_promotion = 0;
+  unsigned int access_counter = 0;
+  unsigned int hugepage_limit = 0;
+  unsigned int access_cycles = 0;
+  unsigned int tau_promotion = 0;
+  unsigned int total_promotions = 0;
   unsigned long num_available_pages = 0, total_inserts = 0, total_evictions = 0; // tracks the current number of available 4kb pages
 
   unsigned int associativity;
@@ -99,12 +105,14 @@ public:
     policy = eviction_policy;
     promotion_policy = promotion_pol;
     hugepage_limit = hugepage_lim;
-    tau_promotion = tau_p;
+    tau_promotion = tau_p; // CUSTOM
     access_cycles = tau_promotion;
     cout << "policy = " << policy << "\n";
     cout << "promotion policy = " << promotion_policy << "\n";
     cout << "page rebalancing every " << tau_promotion << " cycles\n";
     cout << "number of available 4kb pages = " << num_available_pages << endl;
+    if (promotion_pol == INGENS)
+      cout << "INGENS_THRESHOLD: " << INGENS_THRESHOLD << endl;
 
     CacheLine *c;
     entries = new CacheLine[associativity];
@@ -113,7 +121,7 @@ public:
       c = &entries[i];
       freeEntries.push_back(c);
     }
-    
+
     if (policy == CLOCK || policy == WS_CLOCK)
     {
       // set up circular linked list for Clock algo
@@ -149,12 +157,15 @@ public:
   {
     distinct_hugepages.insert(hugepage_address);
     access_counter++;
-    if (promotion_policy == CUSTOM)
+    if (promotion_policy == CUSTOM || promotion_policy == INGENS)
     {
       access_cycles--;
       if (access_cycles < 0)
       {
-        rebalance_hugepages();
+        if (promotion_policy == CUSTOM)
+          rebalance_hugepages_custom();
+        else if (promotion_policy == INGENS)
+          rebalance_hugepages_ingens();
         access_cycles = tau_promotion;
       }
     }
@@ -188,8 +199,8 @@ public:
         c->timer = 0;
       }
 
-      // update acvs
-      update_acv_access(hugepage_address);
+      // update custom_freqs
+      update_promotion_access(hugepage_address, address);
       // cout << "updated acv accesses\n";
       
       // also add periodic "upgrades" every n accesses to promote/demote pages using the policy
@@ -235,30 +246,91 @@ public:
     }
   }
 
-  void rebalance_hugepages()
+  void rebalance_hugepages_custom()
   {
     if (hugepage_limit == 0)
       return;
     
     // PART 1
     // find the regions that are meant to be promoted
-    int size = (hugepage_limit > acvs.size()) ? acvs.size() : hugepage_limit;
+    int size = (hugepage_limit > custom_freqs.size()) ? custom_freqs.size() : hugepage_limit;
     
     std::vector<pair<uint64_t, int>> top_n(size);
-    std::partial_sort_copy(acvs.begin(), acvs.end(), top_n.begin(), top_n.end(),
+    std::partial_sort_copy(custom_freqs.begin(), custom_freqs.end(), top_n.begin(), top_n.end(),
                           [](pair<uint64_t, int> const& l,
                               pair<uint64_t, int> const& r)
                           {
                               return l.second > r.second;
                           });
     std::unordered_set<uint64_t> next_hugepages = std::unordered_set<uint64_t>();
-    // print_map(acvs);
-    acvs.clear();
+    // print_map(custom_freqs);
+    custom_freqs.clear();
 
     for (std::pair<uint64_t, int> p : top_n)
     {
       if (p.second > FREQ_LOWER_BOUND)
       {
+        total_promotions++;
+        uint64_t hugepage_addr = p.first;
+        next_hugepages.insert(hugepage_addr);
+        hugepages.erase(hugepage_addr);
+      }
+    }
+
+    // PART 2
+    // evict and demote hugepages that did not meet the cutoff
+    for (uint64_t p : hugepages)
+    {
+      assert(addr_map.count(p) != 0);
+      evict(p);
+    }
+    
+    // PART 3
+    // delete nodes that will be brought in when huge pages are added
+    remove_4kb_pages(next_hugepages);
+
+    // PART 4
+    // insert huge page regions
+    for (uint64_t p : next_hugepages)
+    {
+      bool isLoad, *dirtyEvict;
+      int64_t *evictedAddr, evictedTag = -1;
+      uint64_t *evictedOffset, offset;
+      if (addr_map.count(p) == 0)
+      {
+        insert(p, 0, isLoad, dirtyEvict, &evictedTag, evictedOffset, true);
+      }
+    }
+    hugepages = next_hugepages;
+  }
+
+  void rebalance_hugepages_ingens()
+  {
+    if (hugepage_limit == 0)
+      return;
+    
+    // PART 1
+    // find the regions that are meant to be promoted
+    int size = (hugepage_limit > ingens_acvs.size()) ? ingens_acvs.size() : hugepage_limit;
+    
+    std::vector<pair<uint64_t, bitset<512>>> top_n(size);
+    std::partial_sort_copy(ingens_acvs.begin(), ingens_acvs.end(), top_n.begin(), top_n.end(),
+                          [](pair<uint64_t, bitset<512>> const& l,
+                              pair<uint64_t, bitset<512>> const& r)
+                          {
+                              return l.second.count() > r.second.count();
+                          });
+    std::unordered_set<uint64_t> next_hugepages = std::unordered_set<uint64_t>();
+    // print_map(custom_freqs);
+    ingens_acvs.clear();
+
+    for (std::pair<uint64_t, bitset<512>> p : top_n)
+    {
+      // cout << "bitset count = " << p.second.count() << endl;
+      // cout << "threshold = " << (512.0 * INGENS_THRESHOLD) << endl;
+      if (p.second.count() >= (512.0 * INGENS_THRESHOLD))
+      {
+        total_promotions++;
         uint64_t hugepage_addr = p.first;
         next_hugepages.insert(hugepage_addr);
         hugepages.erase(hugepage_addr);
@@ -477,17 +549,8 @@ public:
     assert(c != tail);
     map_evict(c);
     deleteNode(c);
-    if (promotion_policy == CUSTOM)
-    {
-      num_available_pages += ((c->isHugePage) ? 512 : 1);
-      freeEntries.push_back(c);
-    }
-    else
-    {
-      num_available_pages += 1;
-      freeEntries.push_back(c);
-      assert(freeEntries.size() == num_available_pages);
-    }
+    num_available_pages += ((c->isHugePage) ? 512 : 1);
+    freeEntries.push_back(c);
   }
 
   unsigned short get_freq(uint64_t address)
@@ -559,15 +622,7 @@ public:
   void insertHalf(CacheLine *c, CacheLine *currHead)
   {
     unsigned int idx = 0, end = 0;
-    unsigned int num_entries;
-    if (promotion_policy == CUSTOM)
-    {
-      num_entries = associativity - num_available_pages;
-    }
-    else
-    {
-      num_entries = associativity - freeEntries.size();
-    }
+    unsigned int num_entries = associativity - num_available_pages;
     CacheLine *curr = head->next;
 
     if (num_entries == associativity)
@@ -720,8 +775,12 @@ public:
     printf("number of available 4kb pages = %lu\n", num_available_pages);
     printf("total inserts = %lu\n", total_inserts);
     printf("total evictions = %lu\n", total_evictions);
-    int size = distinct_hugepages.size();
+    unsigned int size = distinct_hugepages.size();
     printf("number of distinct hugepages = %d\n", size);
+    float f = (float) total_promotions / ((float) access_counter / (float) tau_promotion);
+    printf("average number of hugepages per promotion cycle = %.8f\n", f);
+    assert(size >= 0);
+    assert(access_counter >= 0);
     float rate = 100.0 * ((float) size / (float) access_counter);
     printf("theoretical lower bound on miss rate = %.8f\n", rate);
   }
@@ -732,18 +791,23 @@ public:
     return (addr_map.count(hugepage_addr) > 0);
   }
 
-  void update_acv_access(uint64_t hugepage_addr)
+  void update_promotion_access(uint64_t hugepage_addr, uint64_t address)
   {
     if (promotion_policy == CUSTOM)
     {
-      if (acvs.count(hugepage_addr) == 0)
+      if (custom_freqs.count(hugepage_addr) == 0)
       {
-        acvs[hugepage_addr] = 1;
+        custom_freqs[hugepage_addr] = 1;
       }
       else
       {
-        acvs[hugepage_addr]++;
+        custom_freqs[hugepage_addr]++;
       }
+    }
+    else if (promotion_policy == INGENS)
+    {
+      unsigned int mask = (1 << 9) - 1;
+      ingens_acvs[hugepage_addr][(address & mask)] = 1;
     }
   }
 
