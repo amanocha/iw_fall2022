@@ -29,7 +29,7 @@
 
 // Bounds for INGENS promotion policy
 // (this policy is not actually Ingens, rather a policy inspired by Ingens)
-#define INGENS_THRESHOLD 0.2f
+// #define INGENS_THRESHOLD 0.5f
 
 using namespace std;
 
@@ -90,6 +90,8 @@ public:
   unsigned int access_cycles = 0;
   unsigned int tau_promotion = 0;
   unsigned int total_promotions = 0;
+  unsigned int prints = 125;
+  float ingens_threshold;
   unsigned long num_available_pages = 0, total_inserts = 0, total_evictions = 0; // tracks the current number of available 4kb pages
 
   unsigned int associativity;
@@ -97,7 +99,7 @@ public:
   unsigned policy;
   unsigned promotion_policy;
 
-  CacheSet(int size, int cache_line_size, Replacement_Policy eviction_policy, Promotion_Policy promotion_pol, User_Aware aware, int hugepage_lim, int tau_p)
+  CacheSet(int size, int cache_line_size, Replacement_Policy eviction_policy, Promotion_Policy promotion_pol, User_Aware aware, int hugepage_lim, int tau_p, float ingens_thr)
   {
     associativity = size;
     num_available_pages = size;
@@ -107,12 +109,13 @@ public:
     hugepage_limit = hugepage_lim;
     tau_promotion = tau_p; // CUSTOM
     access_cycles = tau_promotion;
+    ingens_threshold = ingens_thr;
     cout << "policy = " << policy << "\n";
     cout << "promotion policy = " << promotion_policy << "\n";
     cout << "page rebalancing every " << tau_promotion << " cycles\n";
     cout << "number of available 4kb pages = " << num_available_pages << endl;
     if (promotion_pol == INGENS)
-      cout << "INGENS_THRESHOLD: " << INGENS_THRESHOLD << endl;
+      cout << "INGENS_THRESHOLD: " << ingens_threshold << endl;
 
     CacheLine *c;
     entries = new CacheLine[associativity];
@@ -160,7 +163,7 @@ public:
     if (promotion_policy == CUSTOM || promotion_policy == INGENS)
     {
       access_cycles--;
-      if (access_cycles < 0)
+      if (access_cycles < 1)
       {
         if (promotion_policy == CUSTOM)
           rebalance_hugepages_custom();
@@ -306,9 +309,11 @@ public:
 
   void rebalance_hugepages_ingens()
   {
-    if (hugepage_limit == 0)
-      return;
-    
+    if (prints > 0)
+    {
+      cout << "rebalancing pages print " << prints << endl;
+    }
+
     // PART 1
     // find the regions that are meant to be promoted
     int size = (hugepage_limit > ingens_acvs.size()) ? ingens_acvs.size() : hugepage_limit;
@@ -326,9 +331,14 @@ public:
 
     for (std::pair<uint64_t, bitset<512>> p : top_n)
     {
-      // cout << "bitset count = " << p.second.count() << endl;
-      // cout << "threshold = " << (512.0 * INGENS_THRESHOLD) << endl;
-      if (p.second.count() >= (512.0 * INGENS_THRESHOLD))
+      if (prints > 0)
+      {
+        // cout << "bitset count = " << p.second.count() << endl;
+        // cout << "threshold = " << (512.0 * INGENS_THRESHOLD) << endl;
+        // cout << ((p.second.count() >= (512.0 * INGENS_THRESHOLD)) ? "true" : "false") << endl;
+        prints--;
+      }
+      if (p.second.count() >= (512.0 * ingens_threshold))
       {
         total_promotions++;
         uint64_t hugepage_addr = p.first;
@@ -823,7 +833,7 @@ public:
   int log_line_size;
   vector<CacheSet *> sets;
 
-  FunctionalCache(unsigned long size, int assoc, int line_size, Replacement_Policy eviction_policy, Promotion_Policy promotion_policy = NA, User_Aware aware = UNAWARE, int hugepage_lim = 0, int tau_promo = 0)
+  FunctionalCache(unsigned long size, int assoc, int line_size, Replacement_Policy eviction_policy, Promotion_Policy promotion_policy = NA, User_Aware aware = UNAWARE, int hugepage_lim = 0, int tau_promo = 0, float ingens_thr = 100.0)
   {
     cache_line_size = line_size;
     line_count = size / cache_line_size;
@@ -833,7 +843,7 @@ public:
 
     for (int i = 0; i < set_count; i++)
     {
-      CacheSet *set = new CacheSet(assoc, cache_line_size, eviction_policy, promotion_policy, aware, hugepage_lim, tau_promo);
+      CacheSet *set = new CacheSet(assoc, cache_line_size, eviction_policy, promotion_policy, aware, hugepage_lim, tau_promo, ingens_thr);
       sets.push_back(set);
     }
   }
