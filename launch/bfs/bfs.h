@@ -12,7 +12,7 @@
 #include "../../utils/split_huge_page.h"
 #include "../../pin3.7/source/tools/CacheSim/track_access.h"
 
-void init_kernel_policy(int num_nodes, int start_seed, unsigned long *in_index, unsigned long *out_index, unsigned long **in_wl, unsigned long **out_wl, unsigned long **ret, Replacement_Policy policy, Promotion_Policy promotion_policy, User_Aware aware, int hugepage_limit, int tau_promo)
+void init_kernel_policy(int num_nodes, int start_seed, unsigned long *in_index, unsigned long *out_index, unsigned long **in_wl, unsigned long **out_wl, unsigned long **ret, Replacement_Policy policy, Promotion_Policy promotion_policy, User_Aware aware, int hugepage_limit, int tau_promo, float ingens_thr, bool track_rri = false)
 {
   *ret = (unsigned long *)malloc(sizeof(unsigned long) * num_nodes);
   *in_wl = (unsigned long *)malloc(sizeof(unsigned long) * num_nodes * 2);
@@ -34,7 +34,7 @@ void init_kernel_policy(int num_nodes, int start_seed, unsigned long *in_index, 
     (*ret)[i] = 0;
   }
 
-  init_cache(policy, promotion_policy, aware, hugepage_limit, tau_promo);
+  init_cache(policy, promotion_policy, aware, hugepage_limit, tau_promo, ingens_thr, track_rri);
 }
 
 void init_kernel(int num_nodes, int start_seed, unsigned long *in_index, unsigned long *out_index, unsigned long **in_wl, unsigned long **out_wl, unsigned long **ret)
@@ -108,10 +108,12 @@ void kernel(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long
     *out_index = 0;
   }
 
+  done_tracking();
+
   // print results from track_access
-  printf("--- all access info --- ");
-  printf("all hugepages: %d", all_huge);
-  printf("\nmemory accesses = %lu\n", total_num_accesses);
+  printf("--- all access info --- \n");
+  printf("all hugepages: %d\n", all_huge);
+  printf("memory accesses = %lu\n", total_num_accesses);
   printf("cache hits = %lu\n", num_hits);
   printf("cache misses = %lu\n", num_misses);
   float rate = (100.0 * ((float) num_misses) / ((float) total_num_accesses));

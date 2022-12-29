@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
   // Parse arguments
   assert(argc >= 2);
   graph_fname = argv[1];
-  if (argc >= 9) start_seed = atoi(argv[8]);
+  if (argc >= 11) start_seed = atoi(argv[10]);
   else start_seed = 0; 
 
   Replacement_Policy policy = LRU;
@@ -112,6 +112,7 @@ int main(int argc, char** argv) {
     aware = UNAWARE;
   else
     cout << "User aware policy not recognized\n";
+  
 
   
   int hugepage_limit = stoi(argv[5]);
@@ -119,10 +120,18 @@ int main(int argc, char** argv) {
   string t = argv[7];
   bool is_all_huge = (t == "ALLHUGE");
   cout << argv[7] << endl;
+  float ingens_threshold = stof(argv[8]);
+
+  bool track_rri = false;
+  if (argc >= 10)
+  {
+    track_rri = true;
+    cout << "Tracking Re-Reference Interval Metrics\n";
+  }
 
   // Initialize data and create irregular data
   G = parse_bin_files(graph_fname, 0, 1);
-  init_kernel_policy(G.nodes, start_seed, &in_index, &out_index, &in_wl, &out_wl, &ret, policy, promotion_policy, aware, hugepage_limit, tau_promo);
+  init_kernel_policy(G.nodes, start_seed, &in_index, &out_index, &in_wl, &out_wl, &ret, policy, promotion_policy, aware, hugepage_limit, tau_promo, ingens_threshold, track_rri);
 
   // print data structure regions 
   print_regions(G, ret, in_wl, out_wl);
