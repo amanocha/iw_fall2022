@@ -9,6 +9,7 @@ import math
 x = []
 y = []
 z = []
+w = []
 ACCESSES = 2179655452.0
 
 with open('cycles_thresholds.csv', 'r') as csvfile:
@@ -23,10 +24,11 @@ with open('cycles_thresholds.csv', 'r') as csvfile:
         page_evictions, huge_evictions = int(row[8]), int(row[9])
         miss_rate = (float(misses) / ACCESSES)
 
-        if ((not user_aware) and cycles == 10000):
+        if ((not user_aware) and cycles == 5000):
             x.append(threshold)
             y.append(miss_rate)
             z.append(huge_evictions)
+            w.append(page_evictions)
 
 
 plt.yscale("linear")
@@ -34,18 +36,31 @@ plt.xscale("linear")
 # plt.ylim(0.0078, 0.009)
 
 # PLOTTING MISSS RATE vs. THRESHOLD
-plt.plot(x, y, color='b', label="miss rates")
-colors = np.where(np.array(z) > 0, 'r', 'g')
-plt.scatter(x, y, s=10, color=colors)
+# plt.plot(x, y, color='b', label="miss rates")
+# colors = np.where(np.array(z) > 0, 'r', 'g')
+# plt.scatter(x, y, s=10, color=colors)
+# plt.xlabel('Threshold ' + r'$\tau$')
+# plt.ylabel('Page fault rate')
+# plt.axvline(x=0.1250, color='r', linestyle='dashed',
+#             label='huge page eviction cutoff')
+# plt.title(
+#     'Page fault rate against thresholds (' + r'$\alpha$' + ' = 2500)', fontsize=12)
+
+# PLOTTING THRESHOLD vs. PAGE EVICTIONS
+# plt.plot(x, z, color='r', label="huge page evictions")
+# plt.scatter(x, z, s=10, color='r')
+# plt.xlabel('Threshold ' + r'$\tau$')
+# plt.ylabel('Evictions')
+# plt.title(
+#     'Huge page evictions against thresholds (' + r'$\alpha$' + ' = 5000)', fontsize=12)
+
+# PLOTTING THRESHOLD vs. PAGE EVICTIONS
+plt.plot(x, w, color='b', label="baseline page evictions")
+plt.scatter(x, w, s=10, color='b')
 plt.xlabel('Threshold ' + r'$\tau$')
-plt.ylabel('Page fault rate')
-plt.axvline(x=0.1250, color='r', linestyle='dashed',
-            label='huge page eviction cutoff')
+plt.ylabel('Evictions')
 plt.title(
-    'Page fault rate against thresholds (' + r'$\alpha$' + ' = 2500)', fontsize=12)
-
-# PLOTTING THRESHOLD vs. MISS RATE
-
+    'Baseline page evictions against thresholds (' + r'$\alpha$' + ' = 5000)', fontsize=12)
 
 plt.legend()
 plt.show()
