@@ -92,7 +92,7 @@ public:
   unsigned int total_promotions = 0;
   unsigned int prints = 125;
   float ingens_threshold;
-  unsigned long num_available_pages = 0, total_inserts = 0, total_evictions = 0; // tracks the current number of available 4kb pages
+  unsigned long num_available_pages = 0, total_inserts = 0, total_hp_inserts = 0, total_page_evictions = 0, total_hp_evictions = 0; // tracks the current number of available 4kb pages
 
   unsigned int associativity;
   int line_size;
@@ -309,10 +309,10 @@ public:
 
   void rebalance_hugepages_ingens()
   {
-    if (prints > 0)
-    {
-      cout << "rebalancing pages print " << prints << endl;
-    }
+    // if (prints > 0)
+    // {
+    //   cout << "rebalancing pages print " << prints << endl;
+    // }
 
     // PART 1
     // find the regions that are meant to be promoted
@@ -352,7 +352,7 @@ public:
     for (uint64_t p : hugepages)
     {
       assert(addr_map.count(p) != 0);
-      evict(p);
+      // evict(p);
     }
     
     // PART 3
@@ -435,7 +435,7 @@ public:
         while (num_available_pages < space_needed)
         {
           evict_LRU_node();
-          total_evictions++;
+          // total_page_evictions++;
         }
         c = freeEntries.back();
         freeEntries.pop_back();
@@ -501,11 +501,13 @@ public:
     if (c->isHugePage)
     {
       num_available_pages += 512;
+      total_hp_evictions++;
       // cout << "evicted a hugepage with address " << c->addr << endl;
     }
     else
     {
       num_available_pages++;
+      total_page_evictions++;
     }
     map_evict(c);
     deleteNode(c);
@@ -784,7 +786,8 @@ public:
     printf("number of 4kb pages = %lu\n", num_regpages);
     printf("number of available 4kb pages = %lu\n", num_available_pages);
     printf("total inserts = %lu\n", total_inserts);
-    printf("total evictions = %lu\n", total_evictions);
+    printf("number of regular page evictions = %lu\n", total_page_evictions);
+    printf("number of huge page evictions = %lu\n", total_hp_evictions);
     unsigned int size = distinct_hugepages.size();
     printf("number of distinct hugepages = %d\n", size);
     float f = (float) total_promotions / ((float) access_counter / (float) tau_promotion);

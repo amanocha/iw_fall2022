@@ -20,6 +20,7 @@
 
 using namespace std;
 extern int errno;
+bool printing = false;
 
 void print_regions(csr_graph G, unsigned long *ret, unsigned long *in_wl, unsigned long *out_wl) {
   vector<string> data_names{"NODE_ARRAY", "EDGE_ARRAY", "PROP_ARRAY", "IN_WL", "OUT_WL"};
@@ -126,15 +127,20 @@ int main(int argc, char** argv) {
   if (argc >= 10)
   {
     track_rri = true;
-    cout << "Tracking Re-Reference Interval Metrics\n";
+    cout << "Tracking Re-Reference Interval Metrics: ENABLED\n";
+  }
+  else
+  {
+    cout << "Tracking Re-Reference Interval Metrics: DISABLED\n";
   }
 
   // Initialize data and create irregular data
   G = parse_bin_files(graph_fname, 0, 1);
   init_kernel_policy(G.nodes, start_seed, &in_index, &out_index, &in_wl, &out_wl, &ret, policy, promotion_policy, aware, hugepage_limit, tau_promo, ingens_threshold, track_rri);
 
-  // print data structure regions 
-  print_regions(G, ret, in_wl, out_wl);
+  // print data structure regions
+  if (printing) 
+    print_regions(G, ret, in_wl, out_wl);
 
   // Execute app
   printf("\n\nstarting kernel\n");
