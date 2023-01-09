@@ -9,8 +9,9 @@ x = []
 y = []
 
 total_accesses, successes = 0, 0
+twos = 0
 
-with open('hugepage_rris_25.csv', 'r') as csvfile:
+with open('rris_25.csv', 'r') as csvfile:
     plots = csv.reader(csvfile, delimiter=',')
     next(plots)  # skip header
     for row in plots:
@@ -29,8 +30,8 @@ print("rate = ", (successes / total_accesses))
 # plt.bar(x, y)
 
 # for smooth curve
-plt.yscale("log")
-plt.xscale("log")
+# plt.yscale("linear")
+plt.xscale("linear")
 # plt.xlim(0, 10000)
 min_x, max_x = min(x), max(x)
 # xnew = np.linspace(min_x, max_x, 500)
@@ -39,8 +40,8 @@ min_x, max_x = min(x), max(x)
 # plt.plot(x, y)
 # plt.plot(xnew, y_smooth)
 # plt.scatter(x, y, s=3, color=cm.rainbow(min_x, max_x))
-# s = np.where(np.array(y) > 100000000, 12, 3)
-plt.scatter(x, y, s=3)
+s = np.where(np.array(y) > 100000000, 12, 1)
+plt.scatter(x, y, s=s)
 # plt.scatter(x, y, s=s)
 # plt.bar(x, y)
 
@@ -53,6 +54,6 @@ plt.scatter(x, y, s=3)
 plt.xlabel('RRI')
 plt.ylabel('Num. of Accesses')
 plt.title(
-    'RRI of each huge page region access during BFS on Kronecker25 [log]')
+    'RRI of each baseline page access during BFS on Kronecker25 [linear]', fontsize=14)
 # plt.legend()
 plt.show()

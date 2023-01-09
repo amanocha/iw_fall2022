@@ -10,6 +10,7 @@ x = []
 y = []
 z = []
 w = []
+avg_p = []
 ACCESSES = 2179655452.0
 
 with open('cycles_thresholds.csv', 'r') as csvfile:
@@ -29,6 +30,7 @@ with open('cycles_thresholds.csv', 'r') as csvfile:
             y.append(miss_rate)
             z.append(huge_evictions)
             w.append(page_evictions)
+            avg_p.append(avg_promos)
 
 
 plt.yscale("linear")
