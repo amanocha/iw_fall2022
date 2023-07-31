@@ -1,0 +1,12 @@
+# started on Tue Oct 11 17:12:53 2022
+
+dTLB-load-misses: 35401189 1325657978 1325657978
+dTLB-loads: 699021942 1325667406 1325667406
+
+ Performance counter stats for process id '18821':
+
+        35,401,189      dTLB-load-misses          #    5.06% of all dTLB cache hits 
+       699,021,942      dTLB-loads                                                  
+
+       2.054573228 seconds time elapsed
+

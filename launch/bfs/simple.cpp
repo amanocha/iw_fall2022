@@ -40,7 +40,9 @@ int main(int argc, char** argv) {
   // Execute app
   printf("\n\nstarting kernel\n");
   start = chrono::system_clock::now();
+  pin_start();
   kernel(G, ret, in_wl, &in_index, out_wl, &out_index, 0, 1);
+  pin_end();
   end = std::chrono::system_clock::now();
   printf("ending kernel\n");
   

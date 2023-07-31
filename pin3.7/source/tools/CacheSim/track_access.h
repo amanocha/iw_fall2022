@@ -3,14 +3,14 @@
 unsigned long total_num_accesses = 0, num_misses = 0, num_hits = 0;
 
 #define RAM_SIZE 1073741824 // DEFINE RAM SIZE (IN BYTES) HERE
-#define EVICTION_POLICY 0 // SET EVICTION POLICY HERE
+#define EVICTION_POLICY 1 // SET EVICTION POLICY HERE
 
 FunctionalCache *ram;
 bool dirty_evict;
 int64_t evicted_tag;
 uint64_t evicted_offset;
 
-void init() {
+void init_cache() {
   dirty_evict = false;
   evicted_tag = -1;
   evicted_offset = 0;

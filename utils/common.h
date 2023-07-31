@@ -14,6 +14,9 @@
 
 using namespace std;
 
+void pin_start() {}
+void pin_end() {}
+
 int lock_memory(char* addr, size_t size) {
     cout << "Called lock_memory with " << (void*) addr << " and " << size << endl;
     unsigned long page_offset, page_size;
